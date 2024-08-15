@@ -36,5 +36,6 @@
 
 		public const string StructureBlock = "StructureBlock";
 
+		public const string Cauldron = "Cauldron";
 	}
 }

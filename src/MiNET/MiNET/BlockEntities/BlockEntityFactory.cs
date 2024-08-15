@@ -62,6 +62,7 @@ namespace MiNET.BlockEntities
 				BlockEntityIds.ChalkboardBlock => new ChalkboardBlockEntity(),
 				BlockEntityIds.ShulkerBox => new ShulkerBoxBlockEntity(),
 				BlockEntityIds.StructureBlock => new StructureBlockBlockEntity(),
+				BlockEntityIds.Cauldron => new CauldronBlockEntity(),
 				_ => blockEntity
 			};
 		}

@@ -321,6 +321,8 @@ namespace MiNET
 		{
 			if (CurrentForm != null) SendForm(CurrentForm);
 
+			MiNetServer.FastThreadPool.QueueUserWorkItem(SendChunksForKnownPosition);
+
 			OnLocalPlayerIsInitialized(new PlayerEventArgs(this));
 		}
 
@@ -1180,7 +1182,7 @@ namespace MiNET
 
 				CleanCache();
 
-				ForcedSendChunk(SpawnPosition);
+				ForcedSendChunk(SpawnPosition, false);
 
 				// send teleport to spawn
 				SetPosition(SpawnPosition);
@@ -1267,7 +1269,7 @@ namespace MiNET
 						HeadYaw = 91,
 					});
 
-					ForcedSendChunk(newPosition);
+					ForcedSendChunk(newPosition, false);
 					_currentChunkPosition = new ChunkCoordinates(int.MaxValue);
 				}
 
@@ -1751,7 +1753,7 @@ namespace MiNET
 
 				CleanCache();
 
-				ForcedSendChunk(SpawnPosition);
+				ForcedSendChunk(SpawnPosition, false);
 				_currentChunkPosition = new ChunkCoordinates(int.MaxValue);
 
 				// send teleport to spawn
@@ -2965,14 +2967,14 @@ namespace MiNET
 
 		private object _sendChunkSync = new object();
 
-		private void ForcedSendChunk(PlayerLocation position)
+		private void ForcedSendChunk(PlayerLocation position, bool cache = true)
 		{
 			lock (_sendChunkSync)
 			{
 				var chunkPosition = new ChunkCoordinates(position);
 
 				McpeWrapper chunk = Level.GetChunk(chunkPosition)?.GetBatch();
-				if (!_chunksUsed.ContainsKey(chunkPosition))
+				if (cache && !_chunksUsed.ContainsKey(chunkPosition))
 				{
 					_chunksUsed.Add(chunkPosition, chunk);
 				}
@@ -3260,11 +3262,6 @@ namespace MiNET
 			{
 				if (PortalDetected != 0) Log.Debug($"Reset portal detected");
 				if (IsSpawned) PortalDetected = 0;
-			}
-
-			if (_currentChunkPosition != new ChunkCoordinates(KnownPosition))
-			{
-				MiNetServer.FastThreadPool.QueueUserWorkItem(SendChunksForKnownPosition);
 			}
 
 			HungerManager.OnTick();
