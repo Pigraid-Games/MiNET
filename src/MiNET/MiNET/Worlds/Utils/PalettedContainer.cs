@@ -73,7 +73,10 @@ namespace MiNET.Worlds.Utils
 
 		public void SetBlock(int index, int runtimeId)
 		{
-			_data[index] = GetPalettedId(runtimeId);
+			//due to the fact that the instance of the _data field may change
+			//in the process, we should to perform set index on another line!
+			var palettedId = GetPalettedId(runtimeId);
+			_data[index] = palettedId;
 		}
 
 		public void WriteToStream(MemoryStream stream, bool network = true)
