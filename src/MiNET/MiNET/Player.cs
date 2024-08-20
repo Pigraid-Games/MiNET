@@ -979,6 +979,8 @@ namespace MiNET
 
 				SendStartGame();
 
+				SetGameMode(GameMode);
+
 				SendAvailableEntityIdentifiers();
 
 				SendBiomeDefinitionList();

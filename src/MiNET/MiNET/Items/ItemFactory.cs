@@ -118,6 +118,11 @@ namespace MiNET.Items
 			return (T) GetItem(runtimeId, metadata, count);
 		}
 
+		public static Item GetItem(int runtimeId, int blockRuntimeId, short metadata = 0, int count = 1)
+		{
+			return GetItem(GetIdByRuntimeId(runtimeId), metadata, count, BlockFactory.GetBlockByRuntimeId(blockRuntimeId));
+		}
+
 		public static Item GetItem(int runtimeId, short metadata = 0, int count = 1)
 		{
 			return GetItem(GetIdByRuntimeId(runtimeId), metadata, count);

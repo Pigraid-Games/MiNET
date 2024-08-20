@@ -98,16 +98,9 @@ namespace MiNET.Utils
 		{
 			if (ReferenceEquals(x, y)) return true;
 
-			bool result = x.Id == y.Id;
-			if (!result) return false;
+			if (x.Id != y.Id) return false;
 
-			var xStates = new HashSet<IBlockState>(x.States);
-			var yStates = new HashSet<IBlockState>(y.States);
-
-			yStates.IntersectWith(xStates);
-			result = yStates.Count == xStates.Count;
-
-			return result;
+			return x.States.SequenceEqual(y.States);
 		}
 
 		public int GetHashCode([DisallowNull] IBlockStateContainer obj)
@@ -166,8 +159,8 @@ namespace MiNET.Utils
 		{
 			if (ReferenceEquals(null, obj)) return false;
 			if (ReferenceEquals(this, obj)) return true;
-			if (!obj.GetType().IsAssignableTo(typeof(IBlockStateContainer))) return false;
-			return new BlockStateContainerEqualityComparer().Equals(this, (IBlockStateContainer) obj);
+			if (obj is not IBlockStateContainer other) return false;
+			return new BlockStateContainerEqualityComparer().Equals(this, other);
 		}
 
 		public override int GetHashCode()
@@ -179,8 +172,7 @@ namespace MiNET.Utils
 				hash.Add(state);
 			}
 
-			int hashCode = hash.ToHashCode();
-			return hashCode;
+			return hash.ToHashCode();
 		}
 
 		public override string ToString()
@@ -191,8 +183,10 @@ namespace MiNET.Utils
 
 	public class BlockStateContainer : IBlockStateContainer
 	{
+		private static Dictionary<string, IBlockStateContainer> _defaultStates = new Dictionary<string, IBlockStateContainer>();
+
 		private IBlockStateContainer _cache;
-		private bool _changed = true;
+		private bool _changed = false;
 		private bool _factoryState = false;
 
 		public virtual string Id { get; }
@@ -205,6 +199,15 @@ namespace MiNET.Utils
 
 		public byte[] StatesCacheNbt => GetPaletteContainer()?.StatesCacheNbt;
 		public NbtCompound StatesNbt => GetPaletteContainer()?.StatesNbt;
+
+		public BlockStateContainer()
+		{
+			if (!_defaultStates.TryGetValue(Id, out _cache))
+			{
+				BlockFactory.BlockStates.TryGetValue(this, out _cache);
+				_defaultStates.TryAdd(Id, _cache);
+			}
+		}
 
 		private IBlockStateContainer GetPaletteContainer()
 		{
@@ -267,15 +270,15 @@ namespace MiNET.Utils
 
 		protected virtual IEnumerable<IBlockState> GetStates()
 		{
-			return Array.Empty<IBlockState>();
+			return [];
 		}
 		
 		public override bool Equals(object obj)
 		{
 			if (ReferenceEquals(null, obj)) return false;
 			if (ReferenceEquals(this, obj)) return true;
-			if (!obj.GetType().IsAssignableTo(typeof(IBlockStateContainer))) return false;
-			return new BlockStateContainerEqualityComparer().Equals(this, (IBlockStateContainer) obj);
+			if (obj is not IBlockStateContainer other) return false;
+			return new BlockStateContainerEqualityComparer().Equals(this, other);
 		}
 
 		public override int GetHashCode()
@@ -318,12 +321,9 @@ namespace MiNET.Utils
 
 		public override bool Equals(object obj)
 		{
-			if (ReferenceEquals(null, obj))
-				return false;
-			if (ReferenceEquals(this, obj))
-				return true;
-			if (obj.GetType() != this.GetType())
-				return false;
+			if (ReferenceEquals(null, obj)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != this.GetType()) return false;
 			return Equals((BlockStateInt) obj);
 		}
 
@@ -353,12 +353,9 @@ namespace MiNET.Utils
 
 		public override bool Equals(object obj)
 		{
-			if (ReferenceEquals(null, obj))
-				return false;
-			if (ReferenceEquals(this, obj))
-				return true;
-			if (obj.GetType() != this.GetType())
-				return false;
+			if (ReferenceEquals(null, obj)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != GetType()) return false;
 			return Equals((BlockStateByte) obj);
 		}
 
@@ -388,18 +385,15 @@ namespace MiNET.Utils
 
 		public override bool Equals(object obj)
 		{
-			if (ReferenceEquals(null, obj))
-				return false;
-			if (ReferenceEquals(this, obj))
-				return true;
-			if (obj.GetType() != this.GetType())
-				return false;
+			if (ReferenceEquals(null, obj)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (obj.GetType() != this.GetType()) return false;
 			return Equals((BlockStateString) obj);
 		}
 
 		public override int GetHashCode()
 		{
-			return Value.GetHashCode();
+			return Value.ToLowerInvariant().GetHashCode();
 		}
 
 		public override string ToString()
