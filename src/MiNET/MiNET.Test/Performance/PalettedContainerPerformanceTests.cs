@@ -8,7 +8,7 @@ namespace MiNET.Test.Performance
 {
 	[TestClass]
 	[Ignore("only for manual run")]
-	public class PalettedContainerTests : PerformanceTestBase
+	public class PalettedContainerPerformanceTests : PerformanceTestBase
 	{
 		private readonly PalettedContainerData _data = new PalettedContainerData(1, SubChunk.Size);
 		private readonly PalettedContainer _container = new PalettedContainer(new List<int>{ 1, 2, 3 }, new PalettedContainerData(2, SubChunk.Size));

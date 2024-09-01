@@ -675,13 +675,12 @@ namespace MiNET.Net
 			return ReadNbt(_reader);
 		}
 
-		public static Nbt ReadNbt(Stream stream, bool allowAlternativeRootTag = true, bool useVarInt = true)
+		public static Nbt ReadNbt(Stream stream, bool useVarInt = true)
 		{
 			Nbt nbt = new Nbt();
 			NbtFile nbtFile = new NbtFile();
 			nbtFile.BigEndian = false;
 			nbtFile.UseVarInt = useVarInt;
-			nbtFile.AllowAlternativeRootTag = allowAlternativeRootTag;
 
 			nbt.NbtFile = nbtFile;
 			nbtFile.LoadFromStream(stream, NbtCompression.None);
@@ -694,7 +693,6 @@ namespace MiNET.Net
 			NbtFile file = new NbtFile();
 			file.BigEndian = false;
 			file.UseVarInt = useVarInt;
-			file.AllowAlternativeRootTag = false;
 
 			file.LoadFromStream(stream, NbtCompression.None);
 

@@ -227,7 +227,7 @@ namespace MiNET.Blocks
 			}
 		}
 
-		private static PaletteBlockStateContainer GetBlockStateContainer(NbtTag tag)
+		internal static PaletteBlockStateContainer GetBlockStateContainer(NbtTag tag)
 		{
 			string name = tag["name"].StringValue;
 
@@ -273,14 +273,8 @@ namespace MiNET.Blocks
 			return result;
 		}
 
-		public static T FromNbt<T>(NbtTag tag) where T : Block
-		{
-			return (T) FromNbt(tag);
-		}
-
 		public static Block FromNbt(NbtTag compound)
 		{
-			// TODO - rework on serialization
 			var id = compound["name"].StringValue;
 
 			var states = new PaletteBlockStateContainer(id, GetBlockStates(compound));

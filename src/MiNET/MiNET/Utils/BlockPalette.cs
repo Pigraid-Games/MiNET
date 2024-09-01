@@ -29,6 +29,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using fNbt;
+using fNbt.Serialization;
 using MiNET.Blocks;
 using Newtonsoft.Json;
 
@@ -189,6 +190,7 @@ namespace MiNET.Utils
 		private bool _changed = false;
 		private bool _factoryState = false;
 
+		[NbtProperty("name")]
 		public virtual string Id { get; }
 		public int RuntimeId => GetPaletteContainer()?.RuntimeId ?? -1;
 		public short Data => GetPaletteContainer()?.Data ?? 0;
@@ -198,6 +200,8 @@ namespace MiNET.Utils
 		public IEnumerable<IBlockState> States => GetStates();
 
 		public byte[] StatesCacheNbt => GetPaletteContainer()?.StatesCacheNbt;
+
+		[NbtProperty("states")]
 		public NbtCompound StatesNbt => GetPaletteContainer()?.StatesNbt;
 
 		public BlockStateContainer()
