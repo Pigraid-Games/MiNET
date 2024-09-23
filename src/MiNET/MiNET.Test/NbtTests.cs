@@ -26,8 +26,10 @@ namespace MiNET.Test
 		[TestMethod]
 		public void BlockConvertTest()
 		{
-			var block = new PrismarineBrickSlab();
-			block.VerticalHalf = "top";
+			var block = new Bell();
+			block.Attachment = "side";
+			block.Direction = 2;
+			block.ToggleBit = true;
 
 			var tag = NbtConvert.ToNbt(block);
 

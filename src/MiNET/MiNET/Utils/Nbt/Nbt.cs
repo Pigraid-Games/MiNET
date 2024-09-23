@@ -44,6 +44,9 @@ namespace MiNET.Utils.Nbt
 			NbtSerializerSettings.DefaultSettings.NbtMemberHandling = NbtMemberHandling.MarkedOnly;
 
 			NbtSerializerSettings.DefaultSettings.Converters.Add(new ColorNbtConverter());
+			NbtSerializerSettings.DefaultSettings.Converters.Add(new BlockStateStringNbtConverter());
+			NbtSerializerSettings.DefaultSettings.Converters.Add(new BlockStateIntNbtConverter());
+			NbtSerializerSettings.DefaultSettings.Converters.Add(new BlockStateByteNbtConverter());
 			NbtSerializerSettings.DefaultSettings.Converters.Add(new BlockNbtConverter());
 			NbtSerializerSettings.DefaultSettings.Converters.Add(new ItemNbtConverter());
 			NbtSerializerSettings.DefaultSettings.Converters.Add(new ItemsNbtConverter());
