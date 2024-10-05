@@ -28,7 +28,6 @@ using System.Numerics;
 using fNbt.Serialization;
 using log4net;
 using MiNET.Blocks;
-using MiNET.Entities;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 using Newtonsoft.Json;
@@ -88,32 +87,6 @@ namespace MiNET.Items
 			return Block.GetSmelt(block) ?? base.GetSmelt(block);
 		}
 
-		public static int GetFacingDirectionFromEntity(Entity entity)
-		{
-			return entity.GetDirectionEmum() switch
-			{
-				Entity.Direction.South => 4,
-				Entity.Direction.West => 2,
-				Entity.Direction.North => 5,
-				Entity.Direction.East => 3,
-				_ => throw new ArgumentOutOfRangeException()
-			};
-		}
-
-		public static BlockAxis GetPillarAxisFromFace(BlockFace face)
-		{
-			return face switch
-			{
-				BlockFace.Down => BlockAxis.Y,
-				BlockFace.Up => BlockAxis.Y,
-				BlockFace.North => BlockAxis.Z,
-				BlockFace.South => BlockAxis.Z,
-				BlockFace.West => BlockAxis.X,
-				BlockFace.East => BlockAxis.X,
-				_ => throw new ArgumentOutOfRangeException(nameof(face), face, null)
-			};
-		}
-
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates targetCoordinates, BlockFace face, Vector3 faceCoords)
 		{
 			Block currentBlock = world.GetBlock(targetCoordinates);
@@ -142,6 +115,7 @@ namespace MiNET.Items
 				player.Inventory.SetInventorySlot(player.Inventory.InHandSlot, itemInHand);
 			}
 
+			// TODO - should move to the Block
 			world.BroadcastSound(newBlock.Coordinates, LevelSoundEventType.Place, newBlock.RuntimeId);
 
 			return true;

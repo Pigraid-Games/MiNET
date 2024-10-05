@@ -28,9 +28,11 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using log4net;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MiNET.Blocks;
+using MiNET.Blocks.States;
 using MiNET.Items;
 using MiNET.Utils;
 
@@ -67,7 +69,7 @@ namespace MiNET.Test
 		{
 			string fileName = Path.GetTempPath() + "Items_constructors_" + Guid.NewGuid() + ".txt";
 			using FileStream file = File.OpenWrite(fileName);
-			var writer = new IndentedTextWriter(new StreamWriter(file));
+			var writer = new IndentedTextWriter(new StreamWriter(file), "\t");
 
 			writer.Indent += 2;
 			writer.WriteLine();
@@ -93,7 +95,7 @@ namespace MiNET.Test
 		{
 			string fileName = Path.GetTempPath() + "MissingItems_" + Guid.NewGuid() + ".txt";
 			using FileStream file = File.OpenWrite(fileName);
-			var writer = new IndentedTextWriter(new StreamWriter(file));
+			var writer = new IndentedTextWriter(new StreamWriter(file), "\t");
 
 			var itemStates = ItemFactory.ItemStates;
 			var newItems = new Dictionary<string, ItemState>();
@@ -178,6 +180,165 @@ namespace MiNET.Test
 		}
 
 		[TestMethod]
+		public void GeneratePartialBlockStatesFromBlockstates()
+		{
+			var assembly = typeof(Block).Assembly;
+
+			var blockPalette = BlockFactory.BlockPalette;
+			var blockStates = blockPalette
+				.SelectMany(blockState => blockState.States/*.Where(s => s is not BlockStateByte)*/)
+				.DistinctBy(pair => $"{pair.Name}_{pair.GetValue()}")
+				.GroupBy(pair => pair.Name)
+				.ToArray();
+
+			var fileName = Path.GetTempPath() + "MissingBlockStates_" + Guid.NewGuid() + ".txt";
+			using (var file = File.OpenWrite(fileName))
+			{
+				var writer = new IndentedTextWriter(new StreamWriter(file), "\t");
+
+				Console.WriteLine($"Directory:\n{Path.GetTempPath()}");
+				Console.WriteLine($"Filename:\n{fileName}");
+				Log.Warn($"Writing blocks to filename:\n{fileName}");
+
+				writer.WriteLine("using MiNET.Utils;");
+				writer.WriteLineNoTabs($"");
+
+				writer.WriteLine($"namespace MiNET.Blocks.States");
+				writer.WriteLine($"{{");
+				writer.Indent++;
+
+				foreach (var blockState in blockStates)
+				{
+					var stateObj = blockState.First();
+					var type = stateObj.GetType();
+
+					var name = blockState.Key.Replace("minecraft:", "");
+					var className = GenerationUtils.CodeName(name, true);
+					var baseName = type.Name;
+
+					if (blockState.Key == "facing_direction" || blockState.Key == "direction")
+					{
+						className = $"Old{className}";
+					}
+
+					var baseClassPart = string.Empty;
+					var existingType = assembly.GetType($"MiNET.Blocks.{className}");
+					var baseType = assembly.GetType($"MiNET.Blocks.{baseName}");
+
+					var stateTypeName = stateObj switch
+					{
+						BlockStateInt => "int",
+						BlockStateString => "string",
+						BlockStateByte => "byte",
+						_ => throw new Exception($"Unexpected block state type [{type}]")
+					};
+
+					writer.WriteLineNoTabs($"");
+					writer.WriteLine($"public partial class {className} : {baseName}");
+					writer.WriteLine("{");
+					writer.Indent++;
+
+					writer.WriteLine($"public override string Name => \"{blockState.Key}\";");
+					writer.WriteLineNoTabs($"");
+
+					//if (type == typeof(BlockStateString))
+					//{
+					//	writer.WriteLine("public override string Value { get; }");
+					//	writer.WriteLineNoTabs($"");
+					//}
+
+					if (type == typeof(BlockStateString))
+					{
+						// constructor
+						writer.WriteLine($"protected {className}({stateTypeName} value)");
+						writer.WriteLine("{");
+						writer.Indent++;
+						writer.WriteLine($"Value = value;");
+						writer.Indent--;
+						writer.WriteLine("}");
+						writer.WriteLineNoTabs($"");
+
+						// consts generation
+						foreach (var state in blockState)
+						{
+							var value = state.GetValue().ToString();
+							var fieldName = GenerationUtils.CodeName(value, true);
+
+							writer.WriteLine($"protected const string {fieldName}Value = \"{value}\";");
+						}
+
+						writer.WriteLineNoTabs($"");
+
+						// fields generation
+						foreach (var state in blockState)
+						{
+							var value = state.GetValue().ToString();
+							var fieldName = GenerationUtils.CodeName(value, true);
+
+							writer.WriteLine($"public static readonly {className} {fieldName} = new {className}({fieldName}Value);");
+						}
+
+						var values = blockState.Select(s => GenerationUtils.CodeName(s.GetValue().ToString(), true));
+
+						// values
+						writer.WriteLineNoTabs($"");
+						writer.WriteLine($"public static {className}[] Values()");
+						writer.WriteLine("{");
+						writer.Indent++;
+						writer.WriteLine($"return [{string.Join(", ", values)}];");
+						writer.Indent--;
+						writer.WriteLine("}");
+						writer.WriteLineNoTabs($"");
+					}
+					else
+					{
+
+						var values = blockState.Select(s => s.GetValue());
+
+						//writer.WriteLine($"public static {stateTypeName} MinValue {{ get; }} = {values.Min()};");
+						writer.WriteLine($"public const {stateTypeName} MaxValue = {values.Max()};");
+
+						// values
+						writer.WriteLineNoTabs($"");
+						writer.WriteLine($"public static {stateTypeName}[] Values()");
+						writer.WriteLine("{");
+						writer.Indent++;
+						writer.WriteLine($"return [{string.Join(", ", values)}];");
+						writer.Indent--;
+						writer.WriteLine("}");
+						writer.WriteLineNoTabs($"");
+
+						if (type == typeof(BlockStateInt))
+						{
+							// validator
+							writer.WriteLineNoTabs($"");
+							writer.WriteLine($"protected override void ValidateValue(int value)");
+							writer.WriteLine("{");
+							writer.Indent++;
+							writer.WriteLine($"if (value < 0 || value > MaxValue)");
+							writer.WriteLine("{");
+							writer.Indent++;
+							writer.WriteLine($"ThrowArgumentException(value);");
+							writer.Indent--;
+							writer.WriteLine("}");
+							writer.Indent--;
+							writer.WriteLine("}");
+							writer.WriteLineNoTabs($"");
+						}
+					}
+
+					writer.Indent--;
+					writer.WriteLine($"}} // class");
+				}
+
+				writer.Indent--;
+				writer.WriteLine($"}}");
+
+				writer.Flush();
+			}
+		}
+
+		[TestMethod]
 		public void GeneratePartialBlocksFromBlockstates()
 		{
 			var assembly = typeof(Block).Assembly;
@@ -197,7 +358,7 @@ namespace MiNET.Test
 			var fileName = Path.GetTempPath() + "MissingBlocks_" + Guid.NewGuid() + ".txt";
 			using (var file = File.OpenWrite(fileName))
 			{
-				var writer = new IndentedTextWriter(new StreamWriter(file));
+				var writer = new IndentedTextWriter(new StreamWriter(file), "\t");
 
 				Console.WriteLine($"Directory:\n{Path.GetTempPath()}");
 				Console.WriteLine($"Filename:\n{fileName}");
@@ -255,6 +416,7 @@ namespace MiNET.Test
 					// fields generation
 					foreach (var state in currentBlockState.States)
 					{
+						var typeName = GetFieldTypeName(baseType, id, state);
 						var fieldName = $"_{GenerationUtils.CodeName(state.Name, false)}";
 						string valuePart;
 
@@ -267,20 +429,29 @@ namespace MiNET.Test
 							}
 							case BlockStateInt blockStateInt:
 							{
-								valuePart = GetDefaultStateValue<int>(defaultBlockState, state.Name, 0).ToString();
+								valuePart = GetDefaultStateValue(defaultBlockState, state.Name, 0).ToString();
 								break;
 							}
 							case BlockStateString blockStateString:
 							{
-								valuePart = $"\"{GetDefaultStateValue(defaultBlockState, state.Name, string.Empty)}\"";
+								valuePart = GetDefaultStateValue(defaultBlockState, state.Name, string.Empty);
 								break;
 							}
 							default:
 								throw new ArgumentOutOfRangeException(nameof(state));
 						}
 
-						var typeName = state.GetType().Name;
-						writer.WriteLine($"private readonly {typeName} {fieldName} = new {typeName}() {{ Name = \"{state.Name}\", Value = {valuePart} }};");
+						if (state is BlockStateString)
+						{
+							var valueName = GenerationUtils.CodeName(valuePart, true);
+
+							writer.WriteLine($"private MiNET.Blocks.States.{typeName} {fieldName} = (States.{typeName}) MiNET.Blocks.States.{typeName}.{valueName}.Clone();");
+						}
+						else
+						{
+							valuePart = valuePart == "0" ? "" : $" {{ Value = {valuePart} }}";
+							writer.WriteLine($"private MiNET.Blocks.States.{typeName} {fieldName} = new MiNET.Blocks.States.{typeName}(){valuePart};");
+						}
 					}
 
 					if (currentBlockState.States.Any()) writer.WriteLineNoTabs($"");
@@ -295,11 +466,14 @@ namespace MiNET.Test
 
 						var fieldName = $"_{GenerationUtils.CodeName(state.Name, false)}";
 						var propertyName = GenerationUtils.CodeName(state.Name, true);
+						var typeName = propertyName;
+						var existingProperty = baseType.GetProperty(propertyName);
 
 						// If this is on base, skip this property. We need this to implement common functionality.
 						var propertyOverride = baseType != null
 											&& baseType != typeof(Block)
-											&& baseType.GetProperty(propertyName) != null;
+											&& existingProperty != null
+											&& existingProperty.GetMethod.IsVirtual;
 						var propertyOverrideModifierPart = propertyOverride ? $" override" : string.Empty;
 
 						switch (state)
@@ -323,9 +497,29 @@ namespace MiNET.Test
 							case BlockStateInt blockStateInt:
 							{
 								var values = GetStateValues<int>(q, state.Name);
+								var hasKnownType = propertyOverride && existingProperty.PropertyType.IsAssignableTo(typeof(BlockStateInt));
+
+								if (hasKnownType)
+								{
+									typeName = existingProperty.PropertyType.FullName;
+								}
+								else
+								{
+									var knownTypeName = GetIntStateNameByKnownBlockIds(id, state.Name);
+									hasKnownType |= knownTypeName != null;
+
+									typeName = hasKnownType
+										? $"MiNET.Blocks.States.{knownTypeName}"
+										: typeof(int).FullName;
+								}
+
+								if (typeName == typeof(int).FullName)
+								{
+									typeName = "int";
+								}
 
 								writer.WriteLine($"[StateRange({values.Min()}, {values.Max()})]");
-								writer.WriteLine($"public{propertyOverrideModifierPart} int {propertyName} {{ get => {fieldName}.Value; set => NotifyStateUpdate({fieldName}, value); }}");
+								writer.WriteLine($"public{propertyOverrideModifierPart} {typeName} {propertyName} {{ get => {fieldName}{(hasKnownType ? string.Empty : ".Value")}; set => NotifyStateUpdate({fieldName}, value{(hasKnownType ? ".Value" : string.Empty)}); }}");
 								break;
 							}
 							case BlockStateString blockStateString:
@@ -334,10 +528,10 @@ namespace MiNET.Test
 
 								if (values.Length > 1)
 								{
-									writer.WriteLine($"[StateEnum({string.Join(',', values.Select(v => $"\"{v}\""))})]");
+									writer.WriteLine($"[StateEnum({string.Join(", ", values.Select(v => $"\"{v}\""))})]");
 								}
 
-								writer.WriteLine($"public{propertyOverrideModifierPart} string {propertyName} {{ get => {fieldName}.Value; set => NotifyStateUpdate({fieldName}, value); }}");
+								writer.WriteLine($"public{propertyOverrideModifierPart} MiNET.Blocks.States.{typeName} {propertyName} {{ get => {fieldName}; set => NotifyStateUpdate({fieldName}, value.Value); }}");
 								break;
 							}
 							default:
@@ -356,15 +550,17 @@ namespace MiNET.Test
 						writer.WriteLine($"foreach (var state in states)");
 						writer.WriteLine($"{{");
 						writer.Indent++;
-						writer.WriteLine($"switch(state)");
+						writer.WriteLine($"switch (state)");
 						writer.WriteLine($"{{");
 						writer.Indent++;
 
 						foreach (var state in currentBlockState.States)
 						{
-							writer.WriteLine($"case {state.GetType().Name} s when s.Name == \"{state.Name}\":");
+							var stateFieldName = $"_{GenerationUtils.CodeName(state.Name, false)}";
+
+							writer.WriteLine($"case {state.GetType().Name} s when s.Name == {stateFieldName}.Name:");
 							writer.Indent++;
-							writer.WriteLine($"NotifyStateUpdate(_{GenerationUtils.CodeName(state.Name, false)}, s.Value);");
+							writer.WriteLine($"NotifyStateUpdate({stateFieldName}, s.Value);");
 							writer.WriteLine($"break;");
 							writer.Indent--;
 						}
@@ -406,6 +602,30 @@ namespace MiNET.Test
 						writer.WriteLine($"}} // method");
 
 						#endregion
+
+						#region Clone
+
+						writer.WriteLineNoTabs($"");
+						writer.WriteLine($"public override object Clone()");
+						writer.WriteLine($"{{");
+						writer.Indent++;
+						writer.WriteLine($"var block = ({className}) base.Clone();");
+						writer.WriteLineNoTabs($"");
+
+						foreach (var state in currentBlockState.States)
+						{
+							var fieldName = $"_{GenerationUtils.CodeName(state.Name, false)}";
+							var typeName = GetFieldTypeName(baseType, id, state);
+
+							writer.WriteLine($"block.{fieldName} = (MiNET.Blocks.States.{typeName}) {fieldName}.Clone();");
+						}
+
+						writer.WriteLineNoTabs($"");
+						writer.WriteLine($"return block;");
+						writer.Indent--;
+						writer.WriteLine($"}} // method");
+
+						#endregion
 					}
 
 					writer.Indent--;
@@ -417,6 +637,29 @@ namespace MiNET.Test
 
 				writer.Flush();
 			}
+		}
+
+		private string GetFieldTypeName(Type baseType, string id, IBlockState state)
+		{
+			var typeName = GenerationUtils.CodeName(state.Name, true);
+
+			var existingProperty = baseType.GetProperty(typeName);
+			if (existingProperty?.PropertyType.IsAssignableTo(typeof(BlockStateInt)) ?? false && existingProperty.GetMethod.IsVirtual)
+			{
+				return existingProperty.PropertyType.Name;
+			}
+			else
+			{
+				var knownTypeName = GetIntStateNameByKnownBlockIds(id, state.Name);
+				if (knownTypeName != null) return knownTypeName;
+
+				if (state.Name == "facing_direction" || state.Name == "direction")
+				{
+					return $"Old{typeName}";
+				}
+			}
+
+			return typeName;
 		}
 
 		private TStateType GetDefaultStateValue<TStateType>(IBlockStateContainer defaultState, string stateName, TStateType defaultValue)
@@ -443,6 +686,8 @@ namespace MiNET.Test
 							return nameof(LogBase);
 						case "wooden_slabs":
 							return nameof(WoodenSlabBase);
+						case "wooden_stairs":
+							return nameof(WoodenStairsBase);
 						case "double_wooden_slabs":
 							return nameof(DoubleWoodenSlabBase);
 						case "double_plants":
@@ -526,6 +771,10 @@ namespace MiNET.Test
 			{
 				return nameof(SaplingBase);
 			}
+			if (id.EndsWith("_stairs"))
+			{
+				return nameof(StairsBase);
+			}
 			if (name.EndsWith("standing_sign"))
 			{
 				return nameof(StandingSignBase);
@@ -533,6 +782,18 @@ namespace MiNET.Test
 			if (name.EndsWith("_hanging_sign"))
 			{
 				return nameof(HangingSignBase);
+			}
+			if (name.EndsWith("_button"))
+			{
+				return nameof(ButtonBase);
+			}
+			if (name.EndsWith("_door"))
+			{
+				return nameof(DoorBase);
+			}
+			if (name.EndsWith("trapdoor"))
+			{
+				return nameof(TrapdoorBase);
 			}
 			if (name.EndsWith("wall_sign"))
 			{
@@ -550,8 +811,59 @@ namespace MiNET.Test
 			{
 				return nameof(AnvilBase);
 			}
+			if (name.EndsWith("fence"))
+			{
+				return nameof(FenceBase);
+			}
+			if (name.EndsWith("fence_gate"))
+			{
+				return nameof(FenceGateBase);
+			}
 
 			return nameof(Block);
+		}
+
+		private string GetIntStateNameByKnownBlockIds(string id, string stateName)
+		{
+			var name = id.Replace("minecraft:", "");
+
+			return stateName switch
+			{
+				"facing_direction" => name switch
+				{
+					"lightning_rod" or "dropper" or
+					"hopper" or "dispenser" or "barrel" or
+					"attached_pumpkin_stem" or "pumpkin_stem" or
+					"repeating_command_block" or "chain_command_block" or
+					"command_block" or
+					"attached_melon_stem" or "melon_stem" or "wall_banner" => nameof(OldFacingDirection1),
+					_ when name.EndsWith("fence_gate") => nameof(OldFacingDirection4),
+
+					"end_rod" or "piston" or "sticky_piston" or "piston_head" or
+					"piston_arm_collision" or "sticky_piston_arm_collision" => nameof(OldFacingDirection3),
+
+					"skull" or "ladder" or "frame" or "glow_frame" or "jigsaw" => nameof(OldFacingDirection4),
+					_ when name.EndsWith("_button") || name.EndsWith("wall_sign") || 
+						name.EndsWith("hanging_sign") || name.EndsWith("_glazed_terracotta") => nameof(OldFacingDirection4),
+
+					_ => null
+				},
+				"direction" => name switch
+				{
+					"beehive" or "bee_nest" or "loom" or 
+					"grindstone" or "chiseled_bookshelf" or 
+					"bed" or "tripwire_hook" or "cocoa" => nameof(OldDirection1),
+
+					"decorated_pot" or "bell" => nameof(OldDirection2),
+
+					_ when name.EndsWith("_door") => nameof(OldDirection3),
+
+					"trapdoor" => nameof(OldDirection2),
+					_ => null
+				},
+				"vine_direction_bits" => nameof(VineDirectionBits),
+				_ => null
+			};
 		}
 	}
 }
