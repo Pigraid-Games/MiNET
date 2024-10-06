@@ -488,9 +488,7 @@ namespace MiNET.Client
 			if (!Directory.Exists(_basePath))
 				Directory.CreateDirectory(_basePath);
 
-			NbtFile file = new NbtFile();
-			NbtTag dataTag = file.RootTag["Data"] = new NbtCompound("Data");
-			level.SaveToNbt(dataTag);
+			var file = NbtConvert.ToNbtFile(new LevelInfoRoot() { Data = level });
 			file.SaveToFile(Path.Combine(_basePath, "level.dat"), NbtCompression.GZip);
 		}
 

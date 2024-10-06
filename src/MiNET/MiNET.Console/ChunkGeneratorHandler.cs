@@ -79,7 +79,7 @@ namespace MiNET.Console
 			Client.CurrentLocation = new PlayerLocation(Client.SpawnPoint, message.rotation.X, message.rotation.X, message.rotation.Y);
 
 			Client.LevelInfo.LevelName = message.levelId;
-			Client.LevelInfo.Version = 19133;
+			Client.LevelInfo.NbtVersion = 19133;
 			Client.LevelInfo.GameType = message.levelSettings.GameMode;
 
 			BlockPalette = message.blockPalette;
@@ -96,10 +96,8 @@ namespace MiNET.Console
 
 		public override void HandleMcpeSetSpawnPosition(McpeSetSpawnPosition message)
 		{
-			Client.SpawnPoint = new Vector3(message.coordinates.X, message.coordinates.Y, message.coordinates.Z);
-			Client.LevelInfo.SpawnX = (int) Client.SpawnPoint.X;
-			Client.LevelInfo.SpawnY = (int) Client.SpawnPoint.Y;
-			Client.LevelInfo.SpawnZ = (int) Client.SpawnPoint.Z;
+			Client.SpawnPoint = (Vector3) message.coordinates;
+			Client.LevelInfo.Spawn = message.coordinates;
 		}
 
 		private ConcurrentDictionary<CachedChunk, object> _futureChunks = new ConcurrentDictionary<CachedChunk, object>();

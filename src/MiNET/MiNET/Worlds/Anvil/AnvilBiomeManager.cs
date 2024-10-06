@@ -19,7 +19,7 @@ namespace MiNET.Worlds.Anvil
 		{
 			_worldProvider = worldProvider;
 
-			_obfuscatedSeed = new Lazy<long>(() => ObfuscateSeed(_worldProvider.LevelInfo.Seed));
+			_obfuscatedSeed = new Lazy<long>(() => ObfuscateSeed(_worldProvider.LevelInfo.GenerationSettings.Seed));
 		}
 
 		public byte GetNoiseBiome(int x, int y, int z)

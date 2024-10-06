@@ -619,9 +619,7 @@ namespace MiNET.Test
 
 			var stream = new MemoryStream(bytes);
 			Nbt nbt = new Nbt();
-			NbtFile file = new NbtFile();
-			file.BigEndian = false;
-			file.UseVarInt = true;
+			NbtFile file = new NbtFile() { Flavor = NbtFlavor.Bedrock };
 			nbt.NbtFile = file;
 			file.LoadFromStream(stream, NbtCompression.None);
 		}
@@ -633,9 +631,7 @@ namespace MiNET.Test
 
 			var stream = new MemoryStream(bytes);
 			Nbt nbt = new Nbt();
-			NbtFile file = new NbtFile();
-			file.BigEndian = false;
-			file.UseVarInt = true;
+			NbtFile file = new NbtFile() { Flavor = NbtFlavor.Bedrock };
 			nbt.NbtFile = file;
 			file.LoadFromStream(stream, NbtCompression.None);
 		}

@@ -89,8 +89,7 @@ namespace MiNET.Worlds.Anvil
 				if (File.Exists(levelFileName))
 				{
 					file.LoadFromFile(levelFileName);
-					NbtTag dataTag = file.RootTag["Data"];
-					LevelInfo = new LevelInfo(dataTag);
+					LevelInfo = NbtConvert.FromNbt<LevelInfoRoot>(file.RootTag).Data;
 				}
 				else
 				{
@@ -639,7 +638,7 @@ namespace MiNET.Worlds.Anvil
 
 		public Vector3 GetSpawnPoint()
 		{
-			var spawnPoint = new Vector3(LevelInfo.SpawnX, LevelInfo.SpawnY + 2 /* + WaterOffsetY*/, LevelInfo.SpawnZ);
+			var spawnPoint = (Vector3) LevelInfo.Spawn + new Vector3(0, 2 /* + WaterOffsetY*/, 0);
 			if (Dimension == Dimension.TheEnd)
 			{
 				spawnPoint = new Vector3(100, 49, 0);
@@ -685,14 +684,14 @@ namespace MiNET.Worlds.Anvil
 			else if (File.Exists(leveldat))
 				return; // What if this is changed? Need a dirty flag on this
 
-			if (LevelInfo.SpawnY <= 0)
-				LevelInfo.SpawnY = 256;
+			if (LevelInfo.Spawn.Y <= 0)
+			{
+				var newSpawn = LevelInfo.Spawn;
+				newSpawn.Y = 256;
+				LevelInfo.Spawn = newSpawn;
+			}
 
-			var file = new NbtFile();
-			NbtTag dataTag = new NbtCompound("Data");
-			var rootTag = (NbtCompound) file.RootTag;
-			rootTag.Add(dataTag);
-			level.SaveToNbt(dataTag);
+			var file = NbtConvert.ToNbtFile(new LevelInfoRoot() { Data = level });
 			file.SaveToFile(leveldat, NbtCompression.GZip);
 		}
 

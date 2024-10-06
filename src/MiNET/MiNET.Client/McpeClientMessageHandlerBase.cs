@@ -172,7 +172,7 @@ namespace MiNET.Client
 			BlockPalette blockPalette = message.blockPalette;
 			client.BlockPalette = blockPalette;
 			client.LevelInfo.LevelName = message.worldName;
-			client.LevelInfo.Version = 19133;
+			client.LevelInfo.NbtVersion = 19133;
 			client.LevelInfo.GameType = message.levelSettings.GameMode;
 
 			var packet = McpeRequestChunkRadius.CreateObject();
@@ -300,10 +300,8 @@ namespace MiNET.Client
 
 		public virtual void HandleMcpeSetSpawnPosition(McpeSetSpawnPosition message)
 		{
-			Client.SpawnPoint = new Vector3(message.coordinates.X, message.coordinates.Y, message.coordinates.Z);
-			Client.LevelInfo.SpawnX = (int) Client.SpawnPoint.X;
-			Client.LevelInfo.SpawnY = (int) Client.SpawnPoint.Y;
-			Client.LevelInfo.SpawnZ = (int) Client.SpawnPoint.Z;
+			Client.SpawnPoint = (Vector3) message.coordinates;
+			Client.LevelInfo.Spawn = message.coordinates;
 		}
 
 		public virtual void HandleMcpeAnimate(McpeAnimate message)

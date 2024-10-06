@@ -61,8 +61,7 @@ namespace MiNET.Worlds.Tests
 
 			var file = new NbtFile
 			{
-				BigEndian = false,
-				UseVarInt = false,
+				Flavor = NbtFlavor.BedrockNoVarInt
 			};
 			file.RootTag = nbt;
 			var bytes = file.SaveToBuffer(NbtCompression.None);
@@ -79,8 +78,7 @@ namespace MiNET.Worlds.Tests
 		{
 			var file = new NbtFile
 			{
-				BigEndian = false,
-				UseVarInt = false
+				Flavor = NbtFlavor.BedrockNoVarInt
 			};
 			//var levelStream = File.OpenRead(@"C:\Temp\TrashBedrockWorld\level.dat");
 			using FileStream stream = File.OpenRead(@"C:\Temp\TrashBedrockWorld\level_test_generated.dat");
@@ -122,8 +120,7 @@ namespace MiNET.Worlds.Tests
 		{
 			var file = new NbtFile
 			{
-				BigEndian = false,
-				UseVarInt = false
+				Flavor = NbtFlavor.BedrockNoVarInt
 			};
 			using FileStream stream = File.OpenRead(@"C:\Temp\TrashBedrockWorld\level.dat");
 			stream.Seek(8, SeekOrigin.Begin);
