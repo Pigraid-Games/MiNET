@@ -1,6 +1,6 @@
 ﻿using fNbt.Serialization;
 
-namespace MiNET.Worlds.Anvil
+namespace MiNET.Worlds.Anvil.Data
 {
 	[NbtObject]
 	public class LevelInfoRoot

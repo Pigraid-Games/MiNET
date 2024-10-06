@@ -35,6 +35,7 @@ using MiNET.Net;
 using MiNET.Utils;
 using MiNET.Worlds;
 using MiNET.Worlds.Anvil;
+using MiNET.Worlds.Anvil.Data;
 
 namespace MiNET.Client
 {

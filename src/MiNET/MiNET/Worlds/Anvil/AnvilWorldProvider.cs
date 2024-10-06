@@ -17,7 +17,7 @@ using MiNET.Items;
 using MiNET.Net;
 using MiNET.Utils;
 using MiNET.Utils.Vectors;
-using MiNET.Worlds.Utils;
+using MiNET.Worlds.Anvil.Data;
 
 namespace MiNET.Worlds.Anvil
 {
@@ -25,9 +25,6 @@ namespace MiNET.Worlds.Anvil
 	public class AnvilWorldProvider : IWorldProvider, ICachingWorldProvider, ICloneable
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(AnvilWorldProvider));
-
-		private static readonly int WaterBlockRuntimeId = new Water().RuntimeId;
-		private static readonly int SnowLayerBlockRuntimeId = new SnowLayer().RuntimeId;
 
 		public IWorldGenerator MissingChunkProvider { get; set; }
 
@@ -84,12 +81,10 @@ namespace MiNET.Worlds.Anvil
 
 				BasePath ??= Config.GetProperty("PCWorldFolder", "World").Trim();
 
-				var file = new NbtFile();
 				var levelFileName = Path.Combine(BasePath, "level.dat");
 				if (File.Exists(levelFileName))
 				{
-					file.LoadFromFile(levelFileName);
-					LevelInfo = NbtConvert.FromNbt<LevelInfoRoot>(file.RootTag).Data;
+					LevelInfo = NbtConvert.ReadFromFile<LevelInfoRoot>(levelFileName).Data;
 				}
 				else
 				{
@@ -253,14 +248,11 @@ namespace MiNET.Worlds.Anvil
 						throw new Exception($"CX={coordinates.X}, CZ={coordinates.Z}, NBT wrong compression. Expected 0x02, got 0x{compressionMode:X2}. " +
 											$"Offset={offset}, length={length}\n{Packet.HexDump(waste)}");
 
-					var nbt = new NbtFile();
-					nbt.LoadFromStream(regionFile, NbtCompression.ZLib);
+					var data = NbtSerializer.Read<RegionChunk>(regionFile, NbtCompression.ZLib);
 
-					var dataTag = (NbtCompound) nbt.RootTag;
-
-					var isPocketEdition = false; //obsolete
-					if (dataTag.Contains("MCPE BID"))
-						isPocketEdition = dataTag["MCPE BID"].ByteValue == 1;
+					//var isPocketEdition = false; //obsolete
+					//if (dataTag.Contains("MCPE BID"))
+					//	isPocketEdition = dataTag["MCPE BID"].ByteValue == 1;
 
 					var chunk = new ChunkColumn((x, z, i) => new AnvilSubChunk(BiomeManager, x, z, i))
 					{
@@ -272,10 +264,8 @@ namespace MiNET.Worlds.Anvil
 						NeedSave = false
 					};
 
-					ReadHeights(dataTag, chunk);
-					ReadSections(dataTag, chunk);
-					ReadEntities(dataTag, chunk);
-					ReadBlockEntites(dataTag, chunk);
+					data.PopulateChunk(chunk);
+					ReadBlockEntites(data, chunk);
 
 					//NbtList tileTicks = dataTag["TileTicks"] as NbtList;
 
@@ -322,202 +312,9 @@ namespace MiNET.Worlds.Anvil
 			return chunkColumn;
 		}
 
-		private void ReadHeights(NbtTag dataTag, ChunkColumn chunk)
+		private void ReadBlockEntites(RegionChunk data, ChunkColumn chunk)
 		{
-			var heights = dataTag["Heightmaps"] as NbtCompound;
-			if (heights != null)
-			{
-				var worldSurface = heights["WORLD_SURFACE"];
-				if (worldSurface != null)
-				{
-					var longHeights = worldSurface.LongArrayValue;
-					ReadAnyBitLengthShortFromLongs(longHeights, chunk._height, 9);
-				}
-			}
-		}
-
-		private void ReadEntities(NbtTag dataTag, ChunkColumn chunk)
-		{
-			var entities = dataTag["Entities"] as NbtList;
-		}
-
-		private void ReadSections(NbtTag dataTag, ChunkColumn chunk)
-		{
-			var sections = dataTag["sections"] as NbtList;
-
-			foreach (NbtTag sectionTag in sections)
-			{
-				ReadSection(sectionTag, chunk);
-			}
-		}
-
-		private void ReadSection(NbtTag sectionTag, ChunkColumn chunkColumn)
-		{
-			var sectionIndex = (sbyte) sectionTag["Y"].ByteValue;
-
-			// Y can be up to -4, but the array index starts from 0
-			var subChunkId = 4 + sectionIndex;
-
-			if (subChunkId < 0 || subChunkId >= ChunkColumn.WorldHeight << 4)
-			{
-				return;
-			}
-
-			var subChunk = (AnvilSubChunk) chunkColumn[subChunkId];
-
-			ReadBlockStates(sectionTag, chunkColumn, subChunk);
-			ReadBiomes(sectionTag, subChunk);
-			ReadBlockLigths(sectionTag, subChunk);
-			ReadSkyLigths(sectionTag, subChunk);
-		}
-
-		private void ReadBlockStates(NbtTag sectionTag, ChunkColumn chunkColumn, AnvilSubChunk subChunk)
-		{
-			var layer0 = subChunk.Layers[0];
-			var layer1 = subChunk.Layers[1];
-
-			var blockStatesTag = sectionTag["block_states"] as NbtCompound;
-			var palette = blockStatesTag["palette"] as NbtList;
-
-			var runtimeIds = new List<int>(palette.Count);
-			var blockEntities = new List<BlockEntity>(palette.Count);
-			var waterloggedIds = new List<int>(palette.Count);
-			var snowyIds = new List<int>(palette.Count);
-
-			foreach (NbtCompound p in palette)
-			{
-				//
-
-				var id = AnvilPaletteConverter.GetRuntimeIdByPalette(p, out var blockEntity);
-
-				waterloggedIds.Add(
-					p["Properties"]?["waterlogged"]?.StringValue == "true"
-					|| AnvilPaletteConverter.IsSeaBlock(BlockFactory.GetIdByRuntimeId(id))
-						? id : -1);
-
-				//snowyIds.Add(
-				//	p["Properties"]?["snowy"]?.StringValue == "true" 
-				//		? id : -1);
-
-				blockEntities.Add(blockEntity);
-				runtimeIds.Add(id);
-			}
-
-			var waterRuntimeId = runtimeIds.IndexOf(WaterBlockRuntimeId);
-			//var snowRuntimeId = runtimeIds.IndexOf(SnowLayerBlockRuntimeId);
-			ushort waterChunkId = 0;
-			//ushort snowChunkId = 0;
-
-			layer0.Clear();
-			layer0.AppendPaletteRange(runtimeIds);
-
-			var namedRuntimeIds = runtimeIds.Select(id => BlockFactory.GetIdByRuntimeId((short) id)).ToList();
-
-			if (waterloggedIds.Any(id => id >= 0))
-			{
-				waterChunkId = layer1.AppedPalette(WaterBlockRuntimeId);
-			}
-			//if (snowyIds.Any(id => id >= 0))
-			//{
-			//	snowChunkId = layer1.AppedPalette(SnowLayerBlockRuntimeId);
-			//}
-
-			if (runtimeIds.Count == 1)
-			{
-				var block = BlockFactory.GetBlockByRuntimeId(runtimeIds.Single());
-				chunkColumn.IsAllAir &= block is Air;
-
-				return;
-			}
-
-			var data = blockStatesTag["data"].LongArrayValue;
-
-			var blockSize = (byte) Math.Max(4, Math.Ceiling(Math.Log(runtimeIds.Count, 2)));
-
-			var layer0Data = layer0.Data;
-			var layer1Data = layer1.Data;
-			ReadAnvilPalettedContainerData(data, layer0Data, blockSize);
-
-			if (blockEntities.Any() || waterloggedIds.Any())
-			{
-				for (var i = 0; i != layer0Data.BlocksCount; i++)
-				{
-					var block = layer0Data[i];
-					if (waterloggedIds[block] != -1)
-					{
-						layer1Data[i] = waterChunkId;
-					}
-
-					if (blockEntities[block] != null)
-					{
-						var x = i >> 8;
-						var z = i >> 4 & 0xF;
-						var y = i & 0xF;
-
-						var template = blockEntities[block];
-						template.Coordinates = new BlockCoordinates(
-							(subChunk.X << 4) | x,
-							((subChunk.Index << 4) + ChunkColumn.WorldMinY) | y,
-							(subChunk.Z << 4) | z);
-
-						chunkColumn.SetBlockEntity((BlockEntity) template.Clone());
-					}
-				}
-			}
-
-			chunkColumn.IsAllAir = false;
-		}
-
-		private void ReadBlockLigths(NbtTag sectionTag, AnvilSubChunk subChunk)
-		{
-			if (!ReadBlockLight) return;
-
-			var blockLight = sectionTag["BlockLight"]?.ByteArrayValue;
-
-			if (blockLight == null) return;
-
-			//Array.Copy(blockLight, subChunk.BlockLight.Data, 0);
-		}
-
-		private void ReadSkyLigths(NbtTag sectionTag, AnvilSubChunk subChunk)
-		{
-			if (!ReadSkyLight) return;
-
-			var skyLight = sectionTag["SkyLight"]?.ByteArrayValue;
-
-			if (skyLight == null) return;
-
-			//Array.Copy(skyLight, subChunk.SkyLight.Data, 0);
-		}
-
-		private void ReadBiomes(NbtTag sectionTag, AnvilSubChunk subChunk)
-		{
-			var biomesTag = sectionTag["biomes"];
-			var palette = biomesTag["palette"] as NbtList;
-
-			var usingBiomes = palette.Select(p => AnvilPaletteConverter.GetBiomeByName(p.StringValue)).ToArray();
-
-			subChunk.Biomes.Clear();
-			subChunk.Biomes.AppendPaletteRange(usingBiomes.Select(biome => biome.Id));
-
-			if (usingBiomes.Length == 1)
-			{
-				return;
-			}
-
-			var data = biomesTag["data"].LongArrayValue;
-
-			var bitsPerBlock = (byte) Math.Ceiling(Math.Log(usingBiomes.Length, 2));
-
-			var biomesNoise = new byte[64];
-			ReadAnyBitLengthShortFromLongs(data, biomesNoise, bitsPerBlock);
-
-			subChunk.SetBiomesNoise(biomesNoise);
-		}
-
-		private void ReadBlockEntites(NbtCompound dataTag, ChunkColumn chunk)
-		{
-			var blockEntities = dataTag["block_entities"] as NbtList;
+			var blockEntities = data.BlockEntities;
 			if (blockEntities != null)
 				foreach (var nbtTag in blockEntities)
 				{
@@ -673,16 +470,19 @@ namespace MiNET.Worlds.Anvil
 
 		public void SaveLevelInfo(LevelInfo level)
 		{
-			if (Dimension != Dimension.Overworld)
-				return;
+			if (Dimension != Dimension.Overworld) return;
 
 			level.LastPlayed = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 			var leveldat = Path.Combine(BasePath, "level.dat");
 
 			if (!Directory.Exists(BasePath))
+			{
 				Directory.CreateDirectory(BasePath);
+			}
 			else if (File.Exists(leveldat))
+			{
 				return; // What if this is changed? Need a dirty flag on this
+			}
 
 			if (LevelInfo.Spawn.Y <= 0)
 			{
@@ -691,8 +491,7 @@ namespace MiNET.Worlds.Anvil
 				LevelInfo.Spawn = newSpawn;
 			}
 
-			var file = NbtConvert.ToNbtFile(new LevelInfoRoot() { Data = level });
-			file.SaveToFile(leveldat, NbtCompression.GZip);
+			NbtConvert.SaveToFile(new LevelInfoRoot() { Data = level }, leveldat, NbtCompression.GZip);
 		}
 
 		public int SaveChunks()
@@ -1071,60 +870,6 @@ namespace MiNET.Worlds.Anvil
 			sw.Stop();
 			Log.Info("Created " + createdChunks + " air chunks in " + sw.ElapsedMilliseconds + "ms");
 			return createdChunks;
-		}
-
-		private void ReadAnyBitLengthShortFromLongs(long[] longs, short[] shorts, byte shortSize)
-		{
-			var longBitSize = sizeof(long) * 8;
-			var valueBits = (1 << shortSize) - 1;
-
-			var shortsInLongCount = longBitSize / shortSize;
-
-			for (var i = 0; i < shorts.Length; i++)
-			{
-				var offset = i % shortsInLongCount * shortSize;
-				var longsOffset = i / shortsInLongCount;
-
-				shorts[i] = (short) (longs[longsOffset] >> offset & valueBits);
-			}
-		}
-
-		private void ReadAnvilPalettedContainerData(long[] longWords, PalettedContainerData data, byte longBlockSize)
-		{
-			var blockSize = data.DataProfile.BlockSize;
-			var blockMask = (1 << longBlockSize) - 1;
-			var blocksPerWord = data.DataProfile.BlocksPerWord;
-			var blocksCount = data.BlocksCount;
-			var words = data.Data;
-
-			var longWordSize = sizeof(long) * 8;
-			var blocksPerLongWord = longWordSize / longBlockSize;
-
-			for (var i = 0; i != blocksCount; i++)
-			{
-				var index = (i & 0x0F0 | i >> 8 | i << 8) & 0xFFF;
-				ref var word = ref words[index / blocksPerWord];
-
-				var longShift = i % blocksPerLongWord * longBlockSize;
-				var shift = index % blocksPerWord * blockSize;
-				word |= (int) (longWords[i / blocksPerLongWord] >> longShift & blockMask) << shift;
-			}
-		}
-
-		private void ReadAnyBitLengthShortFromLongs(long[] longs, byte[] shorts, byte shortSize)
-		{
-			var longBitSize = sizeof(long) * 8;
-			var valueBits = (1 << shortSize) - 1;
-
-			var shortsInLongCount = longBitSize / shortSize;
-
-			for (var i = 0; i < shorts.Length; i++)
-			{
-				var offset = i % shortsInLongCount * shortSize;
-				var longsOffset = i / shortsInLongCount;
-
-				shorts[i] = (byte) (longs[longsOffset] >> offset & valueBits);
-			}
 		}
 	}
 }

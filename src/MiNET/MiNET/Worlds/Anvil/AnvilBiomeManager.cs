@@ -1,6 +1,6 @@
 ﻿using System;
-using MiNET.Utils.Vectors;
 using System.Security.Cryptography;
+using MiNET.Utils.Vectors;
 
 namespace MiNET.Worlds.Anvil
 {

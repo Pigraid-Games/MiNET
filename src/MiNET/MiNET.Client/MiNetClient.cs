@@ -54,7 +54,7 @@ using MiNET.Utils.IO;
 using MiNET.Utils.Metadata;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
-using MiNET.Worlds.Anvil;
+using MiNET.Worlds.Anvil.Data;
 using Newtonsoft.Json;
 using Org.BouncyCastle.Crypto.Agreement;
 using Org.BouncyCastle.Crypto.Engines;

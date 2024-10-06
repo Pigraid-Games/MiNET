@@ -30,7 +30,7 @@ using fNbt.Serialization;
 using fNbt.Serialization.NamingStrategy;
 using MiNET.Utils.Vectors;
 
-namespace MiNET.Worlds.Anvil
+namespace MiNET.Worlds.Anvil.Data
 {
 	[NbtObject]
 	public class LevelInfo : ICloneable
