@@ -35,16 +35,15 @@ using System.Threading.Tasks;
 using fNbt;
 using log4net;
 using MiNET.Blocks;
-using MiNET.Crafting;
 using MiNET.Entities;
 using MiNET.Items;
 using MiNET.Net;
+using MiNET.Net.Crafting;
 using MiNET.Utils;
 using MiNET.Utils.Metadata;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace MiNET.Client
 {
@@ -64,49 +63,22 @@ namespace MiNET.Client
 
 		public override void HandleMcpeDisconnect(McpeDisconnect message)
 		{
-			Log.Warn("[Disconnect Screen] ");
-			switch (message.message.ToString())
-			{
-				case "disconnectionScreen.notAuthenticated":
-					Log.Warn("You need to authenticate to Xbox Live services to join this server.");
-					break;
-				case "disconnectionScreen.invalidSkin":
-					Log.Warn("Invalid skin.");
-					break;
-				case "disconnectionScreen.serverFull":
-				case "disconnectionScreen.serverFull.title":
-					Log.Warn("Server is full.");
-					break;
-				case "disconnectionScreen.resourcePack":
-					Log.Warn("Resource pack error.");
-					break;
-				case "disconnectionScreen.badPacket":
-					Log.Warn("Client sent invalid packet.");
-					break;
-				default:
-					Log.Warn($"Server requested disconnect with message {message.message.ToString()}");
-					break;
-			}
+			Log.InfoFormat("Disconnect {1}: {0}", message.message, Client.Username);
+
 			base.HandleMcpeDisconnect(message);
 		}
 
 		public override void HandleMcpeResourcePacksInfo(McpeResourcePacksInfo message)
 		{
-			//Log.Warn($"HEX: \n{Packet.HexDump(message.Bytes)}");
+			Log.Warn($"HEX: \n{Packet.HexDump(message.Bytes)}");
 
 			var sb = new StringBuilder();
 			sb.AppendLine();
 
 			sb.AppendLine("Texture packs:");
-			foreach (TexturePackInfo info in message.texturepacks)
+			foreach (var info in message.resourcePacks)
 			{
 				sb.AppendLine($"ID={info.UUID}, Version={info.Version}, Unknown={info.Size}");
-			}
-
-			sb.AppendLine("Behavior packs:");
-			foreach (ResourcePackInfo info in message.behahaviorpackinfos)
-			{
-				sb.AppendLine($"ID={info.UUID}, Version={info.Version}");
 			}
 
 			Log.Debug(sb.ToString());
@@ -138,6 +110,8 @@ namespace MiNET.Client
 			base.HandleMcpeResourcePackStack(message);
 		}
 
+		//private bool _runningBlockMetadataDiscovery;
+
 		private List<ICommandExecutioner> _executioners = new List<ICommandExecutioner>() {new PlaceAllBlocksExecutioner()};
 
 		private void CallPacketHandlers(Packet packet)
@@ -154,6 +128,8 @@ namespace MiNET.Client
 
 		public override void HandleMcpeText(McpeText message)
 		{
+			if (Log.IsDebugEnabled) Log.Debug($"Text: {message.message}");
+
 			string text = message.message;
 			if (string.IsNullOrEmpty(text)) return;
 
@@ -185,7 +161,7 @@ namespace MiNET.Client
 		{
 			CallPacketHandlers(message);
 
-			Log.Debug($"Set container content on Window ID: 0x{message.inventoryId:x2}, Count: {message.input.Count}");
+			Log.Debug($"Set container content on Window ID: 0x{message.inventoryId:x2}, Count: {message.input.Length}");
 
 			if (Client.IsEmulator) return;
 
@@ -205,12 +181,10 @@ namespace MiNET.Client
 
 		public override void HandleMcpeCreativeContent(McpeCreativeContent message)
 		{
-			Log.Warn($"[McpeCreativeContent] Received {message.input.Count} creative items");
-			foreach (var item in message.input)
-			{
-				//Log.Warn($"Got item: {item.Name} ({item.Id} : {item.Metadata})");
-			}
-			Log.Warn($"[McpeCreativeContent] Done reading {message.input.Count} creative items\n");
+			var slots = message.input;
+
+			string fileName = Path.GetTempPath() + "creativeitems_" + Guid.NewGuid() + ".txt";
+			Client.WriteInventoryToFile(fileName, slots);
 		}
 
 		public override void HandleMcpeAddItemEntity(McpeAddItemEntity message)
@@ -223,11 +197,6 @@ namespace MiNET.Client
 			CallPacketHandlers(message);
 		}
 
-		public override void HandleMcpeUpdateSubChunkBlocksPacket(McpeUpdateSubChunkBlocksPacket message)
-		{
-			CallPacketHandlers(message);
-		}
-
 		public override void HandleMcpeStartGame(McpeStartGame message)
 		{
 			Client.EntityId = message.runtimeEntityId;
@@ -235,11 +204,219 @@ namespace MiNET.Client
 			Client.SpawnPoint = message.spawn;
 			Client.CurrentLocation = new PlayerLocation(Client.SpawnPoint, message.rotation.X, message.rotation.X, message.rotation.Y);
 
-			LogGamerules(message.levelSettings.gamerules);
+			BlockPalette blockPalette = message.blockPalette;
+			Client.BlockPalette = message.blockPalette;
+
+			//var blockPalette = BlockFactory.BlockStates;
+			Log.Warn($"Got position from startgame packet: {Client.CurrentLocation}");
+
+			var settings = new JsonSerializerSettings
+			{
+				PreserveReferencesHandling = PreserveReferencesHandling.Arrays,
+				TypeNameHandling = TypeNameHandling.Auto,
+				Formatting = Formatting.Indented,
+				DefaultValueHandling = DefaultValueHandling.Include
+			};
+
+			var fileNameItemstates = Path.GetTempPath() + "itemstates_" + Guid.NewGuid() + ".json";
+			File.WriteAllText(fileNameItemstates, JsonConvert.SerializeObject(message.itemstates, settings));
+			Log.Warn($"itemstates_ Filename:\n{fileNameItemstates}");
+			string fileName = Path.GetTempPath() + "MissingBlocks_" + Guid.NewGuid() + ".txt";
+			using(FileStream file = File.OpenWrite(fileName))
+			{
+				var writer = new IndentedTextWriter(new StreamWriter(file));
+				
+				Log.Warn($"BlockPalette ({blockPalette.Count}) Filename:\n{fileName}");
+
+				writer.WriteLine($"namespace MiNET.Blocks");
+				writer.WriteLine($"{{");
+				writer.Indent++;
+
+				var blocks = new List<(int, string)>();
+
+				foreach (IGrouping<string, IBlockStateContainer> blockstateGrouping in blockPalette.OrderBy(record => record.Id).ThenBy(record => record.Data).ThenBy(record => record.RuntimeId) .GroupBy(record => record.Id))
+				{
+					var currentBlockState = blockstateGrouping.First();
+					Log.Debug($"{currentBlockState.Id}, Id={currentBlockState.Id}");
+
+					var existingBlock = BlockFactory.GetBlockById(currentBlockState.Id);
+					var defaultBlockState = existingBlock as IBlockStateContainer;
+					if (!existingBlock.IsValidStates)
+					{
+						defaultBlockState = blockstateGrouping.FirstOrDefault(bs => bs.Data == 0);
+					}
+
+					Log.Debug($"{currentBlockState.RuntimeId}, {currentBlockState.Id}, {currentBlockState.Data}");
+					Block blockById = BlockFactory.GetBlockById(currentBlockState.Id);
+					// 1.19-update
+					//bool existingBlock = blockById.GetType() != typeof(Block) && !blockById.IsGenerated;
+
+					string blockClassName = CodeName(currentBlockState.Id.Replace("minecraft:", ""), true);
+
+					// 1.19-update
+					//blocks.Add((blockById.Id, blockClassName));
+					writer.WriteLineNoTabs($"");
+
+					writer.WriteLine($"public partial class {blockClassName} // {blockById.Id} typeof={blockById.GetType().Name}");
+					writer.WriteLine($"{{");
+					writer.Indent++;
+
+					writer.WriteLine($"public override string Name => \"{currentBlockState.Id}\";");
+					writer.WriteLineNoTabs("");
+
+					var bits = new List<BlockStateByte>();
+					foreach (var state in blockstateGrouping.First().States)
+					{
+						var q = blockstateGrouping.SelectMany(c => c.States);
+
+						// If this is on base, skip this property. We need this to implement common functionality.
+						Type baseType = blockById.GetType().BaseType;
+						bool propOverride = baseType != null
+											&& ("Block" != baseType.Name
+												&& baseType.GetProperty(CodeName(state.Name, true)) != null);
+
+						switch (state)
+						{
+							case BlockStateByte blockStateByte:
+							{
+								var values = q.Where(s => s.Name == state.Name).Select(d => ((BlockStateByte) d).Value).Distinct().OrderBy(s => s).ToList();
+								byte defaultVal = ((BlockStateByte) defaultBlockState?.States.FirstOrDefault(s => s.Name.Equals(state.Name, StringComparison.OrdinalIgnoreCase)))?.Value ?? 0;
+								if (values.Min() == 0 && values.Max() == 1)
+								{
+									bits.Add(blockStateByte);
+									writer.Write($"[StateBit] ");
+									writer.WriteLine($"public{(propOverride ? " override" : "")} bool {CodeName(state.Name, true)} {{ get; set; }} = {(defaultVal == 1 ? "true" : "false")};");
+								}
+								else
+								{
+									writer.Write($"[StateRange({values.Min()}, {values.Max()})] ");
+									writer.WriteLine($"public{(propOverride ? " override" : "")} byte {CodeName(state.Name, true)} {{ get; set; }} = {defaultVal};");
+								}
+								break;
+							}
+							case BlockStateInt blockStateInt:
+							{
+								var values = q.Where(s => s.Name == state.Name).Select(d => ((BlockStateInt) d).Value).Distinct().OrderBy(s => s).ToList();
+								int defaultVal = ((BlockStateInt) defaultBlockState?.States.FirstOrDefault(s => s.Name.Equals(state.Name, StringComparison.OrdinalIgnoreCase)))?.Value ?? 0;
+								writer.Write($"[StateRange({values.Min()}, {values.Max()})] ");
+								writer.WriteLine($"public{(propOverride ? " override" : "")} int {CodeName(state.Name, true)} {{ get; set; }} = {defaultVal};");
+								break;
+							}
+							case BlockStateString blockStateString:
+							{
+								var values = q.Where(s => s.Name == state.Name).Select(d => ((BlockStateString) d).Value).Distinct().ToList();
+								string defaultVal = ((BlockStateString) defaultBlockState?.States.FirstOrDefault(s => s.Name.Equals(state.Name, StringComparison.OrdinalIgnoreCase)))?.Value ?? "";
+								if (values.Count > 1)
+								{
+									writer.WriteLine($"[StateEnum({string.Join(',', values.Select(v => $"\"{v}\""))})]");
+								}
+								writer.WriteLine($"public{(propOverride ? " override" : "")} string {CodeName(state.Name, true)} {{ get; set; }} = \"{defaultVal}\";");
+								break;
+							}
+							default:
+								throw new ArgumentOutOfRangeException(nameof(state));
+						}
+					}
+
+					// Constructor
+
+					//if (id == -1 || blockById.IsGenerated)
+					//{
+					//	writer.WriteLine($"");
+
+					//	writer.WriteLine($"public {blockClassName}() : base({currentBlockState.Id})");
+					//	writer.WriteLine($"{{");
+					//	writer.Indent++;
+					//	writer.WriteLine($"IsGenerated = true;");
+					//	writer.WriteLine($"SetGenerated();");
+					//	writer.Indent--;
+					//	writer.WriteLine($"}}");
+					//}
+
+					writer.WriteLineNoTabs($"");
+					writer.WriteLine($"public override void SetState(List<IBlockState> states)");
+					writer.WriteLine($"{{");
+					writer.Indent++;
+					writer.WriteLine($"foreach (var state in states)");
+					writer.WriteLine($"{{");
+					writer.Indent++;
+					writer.WriteLine($"switch(state)");
+					writer.WriteLine($"{{");
+					writer.Indent++;
+
+					foreach (var state in blockstateGrouping.First().States)
+					{
+						writer.WriteLine($"case {state.GetType().Name} s when s.Name == \"{state.Name}\":");
+						writer.Indent++;
+						writer.WriteLine($"{CodeName(state.Name, true)} = {(bits.Contains(state) ? "Convert.ToBoolean(s.Value)" : "s.Value")};");
+						writer.WriteLine($"break;");
+						writer.Indent--;
+					}
+
+					writer.Indent--;
+					writer.WriteLine($"}} // switch");
+					writer.Indent--;
+					writer.WriteLine($"}} // foreach");
+					writer.Indent--;
+					writer.WriteLine($"}} // method");
+
+					writer.WriteLineNoTabs($"");
+					writer.WriteLine($"public override BlockStateContainer GetState()");
+					writer.WriteLine($"{{");
+					writer.Indent++;
+					writer.WriteLine($"var record = new BlockStateContainer();");
+					writer.WriteLine($"record.Name = \"{blockstateGrouping.First().Id}\";");
+					writer.WriteLine($"record.Id = {blockstateGrouping.First().Id};");
+					foreach (var state in blockstateGrouping.First().States)
+					{
+						string propName = CodeName(state.Name, true);
+						writer.WriteLine($"record.States.Add(new {state.GetType().Name} {{Name = \"{state.Name}\", Value = {(bits.Contains(state) ? $"Convert.ToByte({propName})" : propName)}}});");
+					}
+					writer.WriteLine($"return record;");
+					writer.Indent--;
+					writer.WriteLine($"}} // method");
+					writer.Indent--;
+					writer.WriteLine($"}} // class");
+				}
+
+				writer.WriteLine();
+
+				// 1.19-update
+				//foreach (var block in blocks.OrderBy(tuple => tuple.Item1))
+				//{
+				//	int clazzId = block.Item1;
+
+				//	Block blockById = BlockFactory.GetBlockById(clazzId);
+				//	bool existingBlock = blockById.GetType() != typeof(Block) && !blockById.IsGenerated;
+				//	if (existingBlock) continue;
+
+				//	string clazzName = block.Item2;
+				//	string baseClazz = clazzName.EndsWith("Stairs") ? "BlockStairs" : "Block";
+				//	baseClazz = clazzName.EndsWith("Slab") && !clazzName.EndsWith("DoubleSlab")? "SlabBase" : baseClazz;
+				//	writer.WriteLine($"public partial class {clazzName} : {baseClazz} {{ " +
+				//					$"public {clazzName}() : base({clazzId}) {{ IsGenerated = true; }} " +
+				//					$"}}");
+				//}
+
+				writer.Indent--;
+				writer.WriteLine($"}}"); // namespace
+
+				//foreach (var block in blocks.OrderBy(tuple => tuple.Item1))
+				//{
+				//	// 495 => new StrippedCrimsonStem(),
+				//	writer.WriteLine($"\t\t\t\t{block.Item1} => new {block.Item2}(),");
+				//}
+
+				writer.Flush();
+			}
+
+			LogGamerules(message.levelSettings.GameRules);
 
 			Client.LevelInfo.LevelName = "Default";
-			Client.LevelInfo.Version = 19133;
-			Client.LevelInfo.GameType = message.levelSettings.gamemode;
+			Client.LevelInfo.NbtVersion = 19133;
+			Client.LevelInfo.GameType = message.levelSettings.GameMode;
+
+			//ClientUtils.SaveLevel(_level);
 
 			{
 				var packet = McpeRequestChunkRadius.CreateObject();
@@ -416,7 +593,7 @@ namespace MiNET.Client
 						transaction.transaction = new ItemUseOnEntityTransaction()
 						{
 							TransactionRecords = new List<TransactionRecord>(),
-							EntityId = id,
+							RuntimeEntityId = id,
 							ActionType = 0,
 							Slot = 0,
 							Item = new ItemAir(),
@@ -431,7 +608,6 @@ namespace MiNET.Client
 
 		public override void HandleMcpeRemoveEntity(McpeRemoveEntity message)
 		{
-			Log.DebugFormat("McpeAddPlayer Entity ID: {0}", message.entityIdSelf);
 			Client.Entities.TryRemove(message.entityIdSelf, out _);
 		}
 
@@ -486,9 +662,9 @@ namespace MiNET.Client
 					writer.WriteLine("new List<Item>");
 					writer.WriteLine("{");
 					writer.Indent++;
-					foreach (var itemStack in shapelessRecipe.Result)
+					foreach (var itemStack in shapelessRecipe.Output)
 					{
-						writer.WriteLine($"new Item({itemStack.Id}, {itemStack.Metadata}, {itemStack.Count}){{ UniqueId = {itemStack.UniqueId}, RuntimeId={itemStack.RuntimeId} }},");
+						writer.WriteLine($"new Item(\"{itemStack.Id}\", {itemStack.Metadata}, {itemStack.Count}){{ UniqueId = {itemStack.UniqueId}, RuntimeId={itemStack.BlockRuntimeId} }},");
 					}
 					writer.Indent--;
 					writer.WriteLine($"}},");
@@ -496,9 +672,10 @@ namespace MiNET.Client
 					writer.WriteLine("new List<Item>");
 					writer.WriteLine("{");
 					writer.Indent++;
-					foreach (var itemStack in shapelessRecipe.Input)
+					foreach (var ingredient in shapelessRecipe.Input)
 					{
-						writer.WriteLine($"new Item({itemStack.Id}, {itemStack.Metadata}, {itemStack.Count}){{ UniqueId = {itemStack.UniqueId}, RuntimeId={itemStack.RuntimeId} }},");
+						// TODO - 1.20-update (make an analog of generating recipe files from Bedrock Data?)
+						//writer.WriteLine($"new Item(\"{ingredient.Id}\", {ingredient.Metadata}, {ingredient.Count}){{ UniqueId = {ingredient.UniqueId}, RuntimeId={ingredient.BlockRuntimeId} }},");
 					}
 					writer.Indent--;
 					writer.WriteLine($"}}, \"{shapelessRecipe.Block}\"){{ UniqueId = {shapelessRecipe.UniqueId} }},");
@@ -525,9 +702,9 @@ namespace MiNET.Client
 					writer.WriteLine("new List<Item>");
 					writer.WriteLine("{");
 					writer.Indent++;
-					foreach (Item item in shapedRecipe.Result)
+					foreach (Item item in shapedRecipe.Output)
 					{
-						writer.WriteLine($"new Item({item.Id}, {item.Metadata}, {item.Count}){{ UniqueId = {item.UniqueId}, RuntimeId={item.RuntimeId} }},");
+						writer.WriteLine($"new Item(\"{item.Id}\", {item.Metadata}, {item.Count}){{ UniqueId = {item.UniqueId}, RuntimeId={item.BlockRuntimeId} }},");
 					}
 					writer.Indent--;
 					writer.WriteLine($"}},");
@@ -535,9 +712,10 @@ namespace MiNET.Client
 					writer.WriteLine("new Item[]");
 					writer.WriteLine("{");
 					writer.Indent++;
-					foreach (Item item in shapedRecipe.Input)
+					foreach (var ingredient in shapedRecipe.Input)
 					{
-						writer.WriteLine($"new Item({item.Id}, {item.Metadata}, {item.Count}){{ UniqueId = {item.UniqueId}, RuntimeId={item.RuntimeId} }},");
+						// TODO - 1.20-update (make an analog of generating recipe files from Bedrock Data?)
+						//writer.WriteLine($"new Item(\"{ingredient.Id}\", {ingredient.Metadata}, {ingredient.Count}){{ RuntimeId={ingredient.BlockRuntimeId} }},");
 					}
 					writer.Indent--;
 					writer.WriteLine($"}}, \"{shapedRecipe.Block}\"){{ UniqueId = {shapedRecipe.UniqueId} }},");
@@ -550,7 +728,7 @@ namespace MiNET.Client
 				var smeltingRecipe = recipe as SmeltingRecipe;
 				if (smeltingRecipe != null)
 				{
-					writer.WriteLine($"new SmeltingRecipe(new Item({smeltingRecipe.Result.Id}, {smeltingRecipe.Result.Metadata}, {smeltingRecipe.Result.Count}){{ UniqueId = {smeltingRecipe.Result.UniqueId}, RuntimeId={smeltingRecipe.Result.RuntimeId} }}, new Item({smeltingRecipe.Input.Id}, {smeltingRecipe.Input.Metadata}){{ UniqueId = {smeltingRecipe.Input.UniqueId}, RuntimeId={smeltingRecipe.Input.RuntimeId} }}, \"{smeltingRecipe.Block}\"),");
+					writer.WriteLine($"new SmeltingRecipe(new Item(\"{smeltingRecipe.Output.Id}\", {smeltingRecipe.Output.Metadata}, {smeltingRecipe.Output.Count}){{ UniqueId = {smeltingRecipe.Output.UniqueId}, RuntimeId={smeltingRecipe.Output.BlockRuntimeId} }}, new Item(\"{smeltingRecipe.Input.Id}\", {smeltingRecipe.Input.Metadata}){{ UniqueId = {smeltingRecipe.Input.UniqueId}, RuntimeId={smeltingRecipe.Input.BlockRuntimeId} }}, \"{smeltingRecipe.Block}\"),");
 					continue;
 				}
 
@@ -605,11 +783,9 @@ namespace MiNET.Client
 				Client.Chunks.GetOrAdd(new ChunkCoordinates(message.chunkX, message.chunkZ), coordinates =>
 				{
 					Log.Debug($"Chunk X={message.chunkX}, Z={message.chunkZ}, size={message.chunkData.Length}, Count={Client.Chunks.Count}");
-					if (BlockstateGenerator.running == false){ Console.WriteLine($"[McpeLevelChunk] Got chunk | X: {message.chunkX,-4} | Z: {message.chunkZ,-4} |"); ; }
-						//broken, chunkData have weird values. Expected header something like: 09 01 02 08
-						//Log.Debug($"{Packet.HexDump(message.Bytes)}");
-						ChunkColumn chunk = null;
-					/*try
+
+					ChunkColumn chunk = null;
+					try
 					{
 						chunk = ClientUtils.DecodeChunkColumn((int) message.subChunkCount, message.chunkData);
 						if (chunk != null)
@@ -618,16 +794,16 @@ namespace MiNET.Client
 							chunk.Z = coordinates.Z;
 							chunk.RecalcHeight();
 							Log.DebugFormat("Chunk X={0}, Z={1}", chunk.X, chunk.Z);
-							foreach (KeyValuePair<BlockCoordinates, NbtCompound> blockEntity in chunk.BlockEntities)
+							foreach (var blockEntity in chunk.BlockEntities)
 							{
-								Log.Debug($"Blockentity: {blockEntity.Value}");
+								Log.Debug($"Blockentity: {blockEntity.Value.GetCompound()}");
 							}
 						}
 					}
 					catch (Exception e)
 					{
 						Log.Error("Reading chunk", e);
-					}*/
+					}
 
 					return chunk;
 				});
@@ -665,12 +841,19 @@ namespace MiNET.Client
 
 		public override void HandleMcpeAvailableCommands(McpeAvailableCommands message)
 		{
-			Log.Warn($"[McpeAvailableCommands] Received {message.CommandList.Count} commnands");
-			foreach (var command in message.CommandList)
-			{
-				//Log.Warn($"Got command: {command.Name} - {command.Versions[0].Description}");
-			}
-			Log.Warn($"[McpeAvailableCommands] Done reading {message.CommandList.Count} commnands\n");
+			//{
+			//	dynamic json = JObject.Parse(message.commands);
+
+			//	//if (Log.IsDebugEnabled) Log.Debug($"Command JSON:\n{json}");
+			//	string fileName = Path.GetTempPath() + "AvailableCommands_" + Guid.NewGuid() + ".json";
+			//	Log.Info($"Writing commands to filename: {fileName}");
+			//	File.WriteAllText(fileName, message.commands);
+			//}
+			//{
+			//	dynamic json = JObject.Parse(message.unknown);
+
+			//	//if (Log.IsDebugEnabled) Log.Debug($"Command (unknown) JSON:\n{json}");
+			//}
 		}
 
 		public override void HandleMcpeResourcePackChunkData(McpeResourcePackChunkData message)

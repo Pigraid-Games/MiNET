@@ -60,6 +60,7 @@ namespace MiNET.Entities
 		GhastFireball = 85,
 		ThrownSpashPotion = 86,
 		ThrownEnderPerl = 87,
+		ThrownWindCharge = 141,
 		LeashKnot = 88,
 		WitherSkull = 89,
 		Boat = 90,
@@ -136,6 +137,7 @@ namespace MiNET.Entities
 		TropicalFish = 111,
 		Fish = 112,
 		Panda = 113,
+		Sniffer = 139,
 
 		Player = 63,
 
@@ -143,8 +145,6 @@ namespace MiNET.Entities
 		Agent = 56,
 		Camera = 62,
 		Chalkboard = 78,
-
-		Herobrine = 666
 	}
 
 	public static class EntityHelpers
@@ -250,6 +250,8 @@ namespace MiNET.Entities
 			{ EntityType.Phantom, "minecraft:phantom" },
 			{ EntityType.Camera, "minecraft:tripod_camera" },
 			{ EntityType.Pillager, "minecraft:pillager" },
+			{ EntityType.Sniffer, "minecraft:sniffer" },
+			{ EntityType.ThrownWindCharge, "minecraft:wind_charge_projectile" }
 		};
 
 		public static TStore Store<TStore>(this Entity entity) where TStore : new()

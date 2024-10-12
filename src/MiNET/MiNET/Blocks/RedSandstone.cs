@@ -23,25 +23,14 @@
 
 #endregion
 
-using MiNET.Items;
-
 namespace MiNET.Blocks
 {
 	public partial class RedSandstone : Block
 	{
-		public RedSandstone() : base(179)
+		public RedSandstone() : base()
 		{
 			BlastResistance = 4;
 			Hardness = 0.8f;
-		}
-
-		public override Item GetSmelt()
-		{
-			if (SandStoneType == "default")
-			{
-				return ItemFactory.GetItem(179, 3);
-			}
-			return null;
 		}
 	}
 }

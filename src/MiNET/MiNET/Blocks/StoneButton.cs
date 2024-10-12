@@ -25,9 +25,9 @@
 
 namespace MiNET.Blocks
 {
-	public partial class StoneButton : Button
+	public partial class StoneButton : ButtonBase
 	{
-		public StoneButton() : base(77)
+		public StoneButton() : base()
 		{
 			TickRate = 20;
 		}

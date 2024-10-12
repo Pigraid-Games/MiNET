@@ -153,9 +153,6 @@ namespace MiNET.Net
 				case McpeMobArmorEquipment msg:
 					handler.HandleMcpeMobArmorEquipment(msg);
 					break;
-				case McpeCraftingEvent msg:
-					handler.HandleMcpeCraftingEvent(msg);
-					break;
 				case McpeInventoryTransaction msg:
 					handler.HandleMcpeInventoryTransaction(msg);
 					break;
@@ -225,26 +222,17 @@ namespace MiNET.Net
 				case McpePlayerSkin msg:
 					handler.HandleMcpePlayerSkin(msg);
 					break;
-				case McpeFilterTextPacket msg:
-					handler.HandleMcpeFilterTextPacket(msg);
-					break;
 				case McpeRequestAbility msg:
 					handler.HandleMcpeRequestAbility(msg);
 					break;
-				case McpeEmotePacket msg:
-					handler.HandleMcpeEmote(msg);
+				case McpeSetPlayerInventoryOptions msg:
+					handler.HandleMcpeSetPlayerInventoryOptions(msg);
 					break;
-				case McpeEmoteList msg:
-					handler.HandleMcpeEmoteList(msg);
+				case McpeBossEvent msg:
+					handler.HandleMcpeBossEvent(msg);
 					break;
-				case McpePermissionRequest msg:
-					handler.HandleMcpePermissionRequest(msg);
-					break;
-				case McpeSetInventoryOptions msg:
-					handler.HandleMcpeSetInventoryOptions(msg);
-					break;
-				case McpeAnvilDamage msg:
-					handler.HandleMcpeAnvilDamage(msg);
+				case McpeServerboundLoadingScreen msg:
+					handler.HandleMcpeServerboundLoadingScreen(msg);
 					break;
 
 				default:

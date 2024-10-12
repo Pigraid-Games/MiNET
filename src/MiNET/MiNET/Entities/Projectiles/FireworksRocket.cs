@@ -28,7 +28,6 @@ using fNbt;
 using log4net;
 using MiNET.Items;
 using MiNET.Net;
-using MiNET.Sounds;
 using MiNET.Utils;
 using MiNET.Utils.Metadata;
 using MiNET.Utils.Vectors;
@@ -85,11 +84,16 @@ namespace MiNET.Entities.Projectiles
 
 		public override void SpawnEntity()
 		{
-			Velocity = Force = KnownPosition.GetDirection().Normalize() * 0.06055374f;
+			Velocity = Force = KnownPosition.GetDirectionVector().Normalize() * 0.06055374f;
 			KnownPosition.Yaw = (float) Velocity.GetYaw();
 			KnownPosition.Pitch = (float) Velocity.GetPitch();
 
-			Level.BroadcastSound(KnownPosition.ToVector3(), LevelSoundEventType.Launch);
+			var sound = McpeLevelSoundEventOld.CreateObject();
+			sound.soundId = 55;
+			sound.blockId = -1;
+			sound.entityType = 1;
+			sound.position = KnownPosition;
+			Level.RelayBroadcast(sound);
 
 			base.SpawnEntity();
 		}
@@ -102,9 +106,14 @@ namespace MiNET.Entities.Projectiles
 			entityEvent.data = 0;
 			Level.RelayBroadcast(entityEvent);
 
-			Level.BroadcastSound(KnownPosition.ToVector3(), LevelSoundEventType.Blast);
-
 			base.DespawnEntity();
+
+			var sound = McpeLevelSoundEventOld.CreateObject();
+			sound.soundId = 56;
+			sound.blockId = -1;
+			sound.entityType = 1;
+			sound.position = KnownPosition;
+			Level.RelayBroadcast(sound);
 		}
 
 		public override void OnTick(Entity[] entities)

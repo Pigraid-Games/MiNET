@@ -26,12 +26,15 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using fNbt;
+using fNbt.Serialization;
 using log4net;
 using MiNET.BlockEntities;
 using MiNET.Blocks;
+using MiNET.Crafting;
 using MiNET.Entities;
-using MiNET.Utils;
+using MiNET.Utils.Nbt;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 using Newtonsoft.Json;
@@ -45,24 +48,28 @@ namespace MiNET.Items
 	///     frames, which turn into an entity when placed, and beds, which turn into a group of blocks when placed. When
 	///     equipped, items (and blocks) briefly display their names above the HUD.
 	/// </summary>
-	public class Item : ICloneable
+	public abstract class Item : ICloneable
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(Item));
 
-		public int UniqueId { get; set; } = Environment.TickCount;
-		public string Name { get; protected set; } = string.Empty;
-		public short Id { get; protected set; }
-		public int NetworkId { get; set; } = -1;
-		public int RuntimeId { get; set; }
-		public short Metadata { get; set; }
-		public byte Count { get; set; }
-		public virtual NbtCompound ExtraData { get; set; }
+		[Obsolete]
+		public short LegacyId { get; protected set; }
 
-		[JsonIgnore] public ItemMaterial ItemMaterial { get; set; } = ItemMaterial.None;
+		[NbtProperty("Name")] public virtual string Id { get; protected set; } = string.Empty;
+		public virtual int RuntimeId => _runtimeId.Value;
+		public int UniqueId { get; set; } = GetUniqueId();
+		public virtual int BlockRuntimeId { get; protected set; }
+		[NbtProperty("Damage")] public short Metadata { get; set; }
+		[NbtProperty] public byte Count { get; set; } = 1;
+		[NbtProperty("tag")] public virtual NbtCompound ExtraData { get; set; }
 
-		[JsonIgnore] public ItemType ItemType { get; set; } = ItemType.Item;
+		public virtual bool Edu { get; protected set; } = false;
 
-		[JsonIgnore] public int MaxStackSize { get; set; } = 64;
+		[JsonIgnore] public virtual ItemMaterial ItemMaterial { get; set; } = ItemMaterial.None;
+
+		[JsonIgnore] public virtual ItemType ItemType { get; set; } = ItemType.Item;
+
+		[JsonIgnore] public virtual int MaxStackSize { get; set; } = 64;
 
 		[JsonIgnore] public bool IsStackable => MaxStackSize > 1;
 
@@ -70,24 +77,22 @@ namespace MiNET.Items
 
 		[JsonIgnore] public int FuelEfficiency { get; set; }
 
-		protected internal Item(string name, short id, short metadata = 0, int count = 1)
-		{
-			Name = name;
-			Id = id;
-			Metadata = metadata;
-			Count = (byte) count;
-		}
+		[JsonIgnore] public bool Unbreakable { get; set; } = false;
 
-		protected internal Item(short id, short metadata = 0, int count = 1) : this(String.Empty, id, metadata, count)
+		private readonly Lazy<int> _runtimeId;
+
+		protected Item()
 		{
+			_runtimeId = new Lazy<int>(() => ItemFactory.GetRuntimeIdById(Id));
 		}
 
 		public virtual void UseItem(Level world, Player player, BlockCoordinates blockCoordinates)
 		{
 		}
 
-		public virtual void PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		public virtual bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
+			return false;
 		}
 
 		public virtual bool BreakBlock(Level world, Player player, Block block, BlockEntity blockEntity)
@@ -198,25 +203,27 @@ namespace MiNET.Items
 			return GetSwordDamage(itemMaterial) - 3;
 		}
 
-		public virtual Item GetSmelt()
+		public virtual Item GetSmelt(string block)
 		{
-			return null;
+			RecipeManager.TryGetSmeltingResult(this, block, out var result);
+
+			return result;
 		}
 
 		public virtual void Release(Level world, Player player, BlockCoordinates blockCoordinates)
 		{
 		}
 
-		protected bool Equals(Item other)
+		protected virtual bool Equals(Item other)
 		{
 			if (Id != other.Id || Metadata != other.Metadata) return false;
 			if (ExtraData == null ^ other.ExtraData == null) return false;
 
 			//TODO: This doesn't work in  most cases. We need to fix comparison when name == null
 			byte[] saveToBuffer = null;
-			if(other.ExtraData?.Name != null) saveToBuffer = new NbtFile(other.ExtraData).SaveToBuffer(NbtCompression.None);
+			if (other.ExtraData?.Name != null) saveToBuffer = new NbtFile(other.ExtraData).SaveToBuffer(NbtCompression.None);
 			byte[] saveToBuffer2 = null;
-			if(ExtraData?.Name != null) saveToBuffer2 = new NbtFile(ExtraData).SaveToBuffer(NbtCompression.None);
+			if (ExtraData?.Name != null) saveToBuffer2 = new NbtFile(ExtraData).SaveToBuffer(NbtCompression.None);
 			bool nbtCheck = !(saveToBuffer == null ^ saveToBuffer2 == null);
 			if (nbtCheck)
 			{
@@ -229,6 +236,7 @@ namespace MiNET.Items
 					nbtCheck = saveToBuffer.SequenceEqual(saveToBuffer2);
 				}
 			}
+
 			return nbtCheck;
 		}
 
@@ -242,15 +250,15 @@ namespace MiNET.Items
 
 		public override int GetHashCode()
 		{
-			unchecked
-			{
-				return (Id * 397) ^ Metadata.GetHashCode();
-			}
+			return HashCode.Combine(Id, Metadata);
 		}
 
-		public object Clone()
+		public virtual object Clone()
 		{
-			return MemberwiseClone();
+			var item = MemberwiseClone() as Item;
+			item.UniqueId = GetUniqueId();
+
+			return item;
 		}
 
 		public override string ToString()
@@ -261,6 +269,14 @@ namespace MiNET.Items
 		public bool Interact(Level level, Player player, Entity target)
 		{
 			return false; // Not handled
+		}
+
+		private static int _uniqueIdIncrement = 100000;
+
+		public static int GetUniqueId()
+		{
+			Interlocked.CompareExchange(ref _uniqueIdIncrement, 100000, int.MaxValue / 2);
+			return Interlocked.Increment(ref _uniqueIdIncrement);
 		}
 	}
 
@@ -276,7 +292,8 @@ namespace MiNET.Items
 		Gold = 3,
 		Iron = 4,
 		Diamond = 5,
-		Netherite = 6
+		Netherite = 6,
+		Turtle = 7
 	}
 
 	public enum ItemType

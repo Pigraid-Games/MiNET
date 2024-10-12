@@ -24,25 +24,14 @@
 #endregion
 
 
-using MiNET.Items;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-using System.Numerics;
-
 namespace MiNET.Blocks
 {
 	public partial class Observer : Block
 	{
-		public Observer() : base(251)
+		public Observer() : base()
 		{
 			BlastResistance = 17.5f;
 			IsTransparent = true;
-		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			FacingDirection = ItemBlock.GetReverseFacingDirectionFromEntity(player);
-			return false;
 		}
 	}
 }

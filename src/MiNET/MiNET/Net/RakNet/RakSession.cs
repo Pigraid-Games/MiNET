@@ -33,6 +33,7 @@ using System.Threading.Tasks;
 using log4net;
 using MiNET.Utils;
 using MiNET.Utils.Collections;
+using MiNET.Utils.IO;
 
 namespace MiNET.Net.RakNet
 {
@@ -58,7 +59,7 @@ namespace MiNET.Net.RakNet
 
 		public ICustomMessageHandler CustomMessageHandler { get; set; }
 
-		public bool EnableCompression { get; set; } = false;
+		public CompressionManager CompressionManager { get; set; }
 
 		public string Username { get; set; }
 		public IPEndPoint EndPoint { get; private set; }
@@ -112,6 +113,8 @@ namespace MiNET.Net.RakNet
 		public RakSession(ConnectionInfo connectionInfo, IPacketSender packetSender, IPEndPoint endPoint, short mtuSize, ICustomMessageHandler messageHandler = null)
 		{
 			Log.Debug($"Create session for {endPoint}");
+
+			CompressionManager = new CompressionManager();
 
 			_packetSender = packetSender;
 			ConnectionInfo = connectionInfo;
@@ -419,7 +422,7 @@ namespace MiNET.Net.RakNet
 
 		public virtual void Disconnect(string reason, bool sendDisconnect = true)
 		{
-			CustomMessageHandler?.Disconnect("RakSession: " + reason, sendDisconnect);
+			CustomMessageHandler?.Disconnect(reason, sendDisconnect);
 			Close();
 		}
 
@@ -450,6 +453,12 @@ namespace MiNET.Net.RakNet
 
 			lock (_queueSync)
 			{
+				if (_sendQueueNotConcurrent.Contains(packet))
+				{
+					Log.Warn("Resending packet that already contains in queue");
+					return;
+				}
+
 				_sendQueueNotConcurrent.Enqueue(packet);
 			}
 		}
@@ -585,24 +594,7 @@ namespace MiNET.Net.RakNet
 
 				if (sendList.Count == 0) return;
 
-				List<Packet> prepareSend = CustomMessageHandler.PrepareSend(sendList);
-				var preppedSendList = new List<Packet>();
-				foreach (Packet packet in prepareSend)
-				{
-					Packet message = packet;
-
-					if (CustomMessageHandler != null) message = CustomMessageHandler.HandleOrderedSend(message);
-
-					Reliability reliability = message.ReliabilityHeader.Reliability;
-					if (reliability == Reliability.Undefined) reliability = Reliability.Reliable; // Questionable practice
-
-					if (reliability == Reliability.ReliableOrdered) message.ReliabilityHeader.OrderingIndex = Interlocked.Increment(ref OrderingIndex);
-
-					preppedSendList.Add(message);
-					//await _packetSender.SendPacketAsync(this, message);
-				}
-
-				await _packetSender.SendPacketAsync(this, preppedSendList);
+				await SendPrepareDirectPackets(sendList);
 			}
 			catch (Exception e)
 			{
@@ -627,24 +619,7 @@ namespace MiNET.Net.RakNet
 
 		public void SendPrepareDirectPacket(Packet packet)
 		{
-			List<Packet> prepareSend = CustomMessageHandler.PrepareSend(new List<Packet> { packet });
-			var preppedSendList = new List<Packet>();
-			foreach (Packet preparePacket in prepareSend)
-			{
-				Packet message = preparePacket;
-
-				if (CustomMessageHandler != null)
-					message = CustomMessageHandler.HandleOrderedSend(message);
-
-				Reliability reliability = message.ReliabilityHeader.Reliability;
-				if (reliability == Reliability.Undefined)
-					reliability = Reliability.Reliable; // Questionable practice
-
-				if (reliability == Reliability.ReliableOrdered)
-					message.ReliabilityHeader.OrderingIndex = Interlocked.Increment(ref OrderingIndex);
-
-				_packetSender.SendPacketAsync(this, message).Wait();
-			}
+			SendPrepareDirectPackets(new List<Packet> { packet }).Wait();
 		}
 
 		public IPEndPoint GetClientEndPoint()
@@ -657,20 +632,24 @@ namespace MiNET.Net.RakNet
 			return NetworkIdentifier;
 		}
 
-		public void Close()
+		public void Close(bool sendDisconnect = true)
 		{
 			if (!ConnectionInfo.RakSessions.TryRemove(EndPoint, out _))
 			{
 				return;
 			}
 
-			SendDirectPacket(DisconnectionNotification.CreateObject());
-
-			SendQueueAsync(500).Wait();
-
 			State = ConnectionState.Unconnected;
 			Evicted = true;
 			CustomMessageHandler = null;
+
+			SendQueueAsync(500).Wait();
+
+			if (sendDisconnect)
+			{
+				// Send with high priority, bypass queue
+				SendDirectPacket(DisconnectionNotification.CreateObject());
+			}
 
 			_cancellationToken.Cancel();
 			_packetQueuedWaitEvent.Set();
@@ -692,6 +671,33 @@ namespace MiNET.Net.RakNet
 			}
 
 			if (Log.IsDebugEnabled) Log.Info($"Closed network session for player {Username}");
+		}
+
+		private async Task SendPrepareDirectPackets(List<Packet> packets)
+		{
+			List<Packet> prepareSend = CustomMessageHandler.PrepareSend(packets);
+			var preppedSendList = new List<Packet>();
+			foreach (Packet preparePacket in prepareSend)
+			{
+				Packet message = preparePacket;
+
+				if (CustomMessageHandler != null)
+				{
+					message = CustomMessageHandler.HandleOrderedSend(message);
+				}
+
+				Reliability reliability = message.ReliabilityHeader.Reliability;
+				if (reliability == Reliability.Undefined) reliability = Reliability.Reliable; // Questionable practice
+
+				if (reliability == Reliability.ReliableOrdered)
+				{
+					if (message.Encode().Length == 0) throw new Exception("Empty packet sending detected");
+				}
+
+				preppedSendList.Add(message);
+			}
+
+			await _packetSender.SendPacketAsync(this, preppedSendList);
 		}
 	}
 }

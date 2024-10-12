@@ -23,11 +23,8 @@
 
 #endregion
 
-using System.Collections.Generic;
 using System.Numerics;
 using MiNET.BlockEntities;
-using MiNET.Net;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -35,7 +32,7 @@ namespace MiNET.Blocks
 {
 	public partial class EnchantingTable : Block
 	{
-		public EnchantingTable() : base(116)
+		public EnchantingTable() : base()
 		{
 			FuelEfficiency = 15;
 			IsTransparent = true;
@@ -45,24 +42,6 @@ namespace MiNET.Blocks
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			byte direction = player.GetDirection();
-
-			//switch (direction)
-			//{
-			//	case 1:
-			//		Metadata = 2;
-			//		break; // West
-			//	case 2:
-			//		Metadata = 5;
-			//		break; // North
-			//	case 3:
-			//		Metadata = 3;
-			//		break; // East
-			//	case 0:
-			//		Metadata = 4;
-			//		break; // South 
-			//}
-
 			var tableBlockEntity = new EnchantingTableBlockEntity {Coordinates = Coordinates};
 
 			world.SetBlockEntity(tableBlockEntity);
@@ -73,7 +52,6 @@ namespace MiNET.Blocks
 
 		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
 		{
-			
 			player.OpenInventory(blockCoordinates);
 
 			return true;

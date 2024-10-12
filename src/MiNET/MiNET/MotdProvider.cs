@@ -24,9 +24,7 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
 using System.Net;
-using MiNET.BlockEntities;
 using MiNET.Net;
 using MiNET.Net.RakNet;
 using MiNET.Utils;
@@ -46,9 +44,7 @@ namespace MiNET
 		public long ServerId { get; set; }
 
 		public string GameMode { get; set; }
-		public List<String> Motds { get; set; } = new List<String>();
 
-		private int clock = 0;
 		public MotdProvider()
 		{
 			byte[] buffer = new byte[8];
@@ -57,14 +53,9 @@ namespace MiNET
 			ServerId = BitConverter.ToInt64(buffer, 0);
 
 			ServerId = Config.GetProperty("serverid", ServerId);
+			Motd = Config.GetProperty("motd", "MiNET Server");
 			SecondLine = Config.GetProperty("motd-2nd", "MiNET");
 			GameMode = Config.GetProperty("gamemode", "Survival");
-			var motdData = Config.GetProperty("motd", "MiNET Server");
-			foreach (string motd in motdData.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
-			{
-				Motds.Add(motd);
-			}
-
 		}
 
 		public virtual string GetMotd(ConnectionInfo connectionInfo, IPEndPoint caller, bool eduMotd = false)
@@ -75,17 +66,23 @@ namespace MiNET
 			ulong serverId = (ulong) ServerId;
 
 			var protocolVersion = McpeProtocolInfo.ProtocolVersion.ToString();
+			var clientVersion = McpeProtocolInfo.GameVersion;
+			var edition = "MCPE";
 
-			if(clock/10 == Motds.Count)
+			if (eduMotd)
 			{
-				clock = 0;
+				protocolVersion = "291";
+				clientVersion = "1.7.0";
+				edition = "MCEE";
 			}
-			Motd = Motds[clock / 10];
-			if (DateTime.Now.Second % 5 == 0)
-			{
-				clock++;
-			}
-			return string.Format($"{"MCPE"};{Motd};{protocolVersion};{McpeProtocolInfo.GameVersion};{NumberOfPlayers};{MaxNumberOfPlayers};{serverId};{SecondLine};{GameMode};");
+			
+			// Big brain Microjang moment here
+			if (SecondLine == "")
+				// As of 1.16.210, the sub-MOTD cannot be blank or Minecraft won't see the MOTD
+				SecondLine = "MiNET";
+
+			// 2019-12-29 20:00:46,672 [DedicatedThreadPool-8631ff8f-0339-4a0d-83c7-222335bdb410_1] WARN  MiNET.Client.MiNetClient - MOTD: MCPE;gurunx;389;1.14.1;1;8;9586953286635751800;My World;Creative;1;53387;53388;
+			return string.Format($"{edition};{Motd};{protocolVersion};{clientVersion};{NumberOfPlayers};{MaxNumberOfPlayers};{serverId};{SecondLine};{GameMode};");
 		}
 	}
 }

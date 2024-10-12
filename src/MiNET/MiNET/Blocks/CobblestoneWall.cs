@@ -22,44 +22,16 @@
 // All Rights Reserved.
 
 #endregion
-using System;
-using System.Numerics;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
 
 namespace MiNET.Blocks
 {
 	public partial class CobblestoneWall : Block
 	{
-		public CobblestoneWall() : base(139)
+		public CobblestoneWall() : base()
 		{
 			IsTransparent = true;
 			BlastResistance = 30;
 			Hardness = 2;
-		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			var itemInHand = player.Inventory.GetItemInHand();
-			WallBlockType = itemInHand.Metadata switch
-			{
-				0 => "cobblestone",
-				1 => "mossy_cobblestone",
-				2 => "granite",
-				3 => "diorite",
-				4 => "andesite",
-				5 => "sandstone",
-				6 => "red_sandstone",
-				7 => "stone_brick",
-				8 => "mossy_stone_brick",
-				9 => "brick",
-				10 => "nether_brick",
-				11 => "red_nether_brick",
-				12 => "end_stone",
-				13 => "prismarine",
-				_ => throw new ArgumentOutOfRangeException()
-			};
-			return false;
 		}
 	}
 }

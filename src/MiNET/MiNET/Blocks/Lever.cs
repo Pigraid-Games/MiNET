@@ -23,10 +23,8 @@
 
 #endregion
 
-using System;
 using System.Numerics;
-using log4net;
-using MiNET.Items;
+using MiNET.Blocks.States;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -34,10 +32,7 @@ namespace MiNET.Blocks
 {
 	public partial class Lever : Block
 	{
-		public static string Direction { get; set; }
-		private BlockCoordinates[] cord = [];
-		private static readonly ILog Log = LogManager.GetLogger(typeof(Lever));
-		public Lever() : base(69)
+		public Lever() : base()
 		{
 			IsTransparent = true;
 			IsSolid = false;
@@ -47,93 +42,17 @@ namespace MiNET.Blocks
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			var FacingDirection = ItemBlock.GetFacingDirectionFromEntity(player);
-			Log.Debug(FacingDirection);
-			if (face == BlockFace.Down)
-			{
-				Direction = FacingDirection switch
-				{
-					5 or 4 => "down_east_west",
-					2 or 3 => "down_north_south",
-					_ => throw new ArgumentOutOfRangeException()
-				};
-			}
-			else if (face == BlockFace.Up)
-			{
-				Direction = FacingDirection switch
-				{
-					5 or 4 => "up_east_west",
-					2 or 3 => "up_north_south",
-					_ => throw new ArgumentOutOfRangeException()
-				};
-			}
-			else
-			{
-				Direction = FacingDirection switch
-				{
-					5 => "east",
-					3 => "south",
-					4 => "west",
-					2 => "north",
-					_ => throw new ArgumentOutOfRangeException()
-				};
-			}
-			LeverDirection = Direction;
+			LeverDirection = LeverDirection.FromFaceAndDirections(face, player.KnownPosition.GetDirection());
+
 			return false;
 		}
 
 		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
 		{
-			world.BroadcastSound(blockCoordinates, LevelSoundEventType.ButtonOn);
-			world.ScheduleBlockTick(this, 10);
-			LeverDirection = Direction;
-			if (!OpenBit)
-			{
-				OpenBit = true;
-				world.SetBlock(this);
-			}
-			else
-			{
-				OpenBit = false;
-				world.SetBlock(this);
-			}
+			OpenBit = !OpenBit;
+			world.SetBlock(this);
+
 			return true;
 		}
-
-		public override void BreakBlock(Level level, BlockFace face, bool silent = false)
-		{
-			BlockCoordinates[] cord = { Coordinates.BlockNorth(), Coordinates.BlockSouth(), Coordinates.BlockEast(), Coordinates.BlockWest(), Coordinates.BlockUp(), Coordinates.BlockDown() };
-			level.CancelBlockTick(this);
-			foreach (BlockCoordinates bCord in cord)
-			{
-				var blockk = level.GetBlock(bCord);
-				RedstoneController.signal(level, bCord, false);
-			}
-			base.BreakBlock(level, face);
-		}
-
-		public override void BlockAdded(Level level)
-		{
-			if (level.RedstoneEnabled) { level.ScheduleBlockTick(this, 10); }
-		}
-
-		public override void OnTick(Level level, bool isRandom)
-		{
-			if (isRandom) { return; }
-			cord = [Coordinates.BlockNorth(), Coordinates.BlockSouth(), Coordinates.BlockEast(), Coordinates.BlockWest(), Coordinates.BlockDown(), Coordinates.BlockNorthEast(), Coordinates.BlockNorthWest(), Coordinates.BlockSouthEast(), Coordinates.BlockSouthWest()];
-			foreach (BlockCoordinates bCord in cord)
-			{
-				if (OpenBit)
-				{
-					RedstoneController.signal(level, bCord, true);
-				}
-				else
-				{
-					RedstoneController.signal(level, bCord, false);
-				}
-			}
-			level.ScheduleBlockTick(this, 10);
-		}
-
 	}
 }

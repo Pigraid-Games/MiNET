@@ -23,25 +23,14 @@
 
 #endregion
 
-using MiNET.Items;
-
 namespace MiNET.Blocks
 {
 	public partial class Sponge : Block
 	{
-		public Sponge() : base(19)
+		public Sponge() : base()
 		{
 			BlastResistance = 3;
 			Hardness = 0.6f;
-		}
-
-		public override Item GetSmelt()
-		{
-			if (SpongeType == "wet")
-			{
-				return ItemFactory.GetItem(19, 0);
-			}
-			return null;
 		}
 	}
 }

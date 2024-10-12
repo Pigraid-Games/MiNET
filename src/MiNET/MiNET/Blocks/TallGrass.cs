@@ -25,22 +25,14 @@
 
 using System;
 using MiNET.Items;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
 namespace MiNET.Blocks
 {
-	public partial class Tallgrass : Block
+	public partial class TallGrass
 	{
-		public enum TallGrassTypes
-		{
-			DeadShrub = 0,
-			TallGrass = 1,
-			Fern = 2
-		}
-
-		public Tallgrass() : base(31)
+		public TallGrass() : base()
 		{
 			BlastResistance = 3;
 			Hardness = 0.6f;
@@ -68,16 +60,16 @@ namespace MiNET.Blocks
 			}
 		}
 
-		public override Item[] GetDrops(Item tool)
+		public override Item[] GetDrops(Level world, Item tool)
 		{
 			// 50% chance to drop seeds.
 			var rnd = new Random();
 			if (rnd.NextDouble() > 0.5)
 			{
-				return new[] {ItemFactory.GetItem(295)};
+				return [new ItemWheatSeeds()];
 			}
 
-			return new Item[0];
+			return Array.Empty<Item>();
 		}
 	}
 }

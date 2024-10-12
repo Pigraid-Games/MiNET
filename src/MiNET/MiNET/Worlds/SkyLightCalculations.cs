@@ -27,12 +27,25 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading.Tasks;
 using log4net;
 using MiNET.Blocks;
+using MiNET.Utils;
+using MiNET.Utils.IO;
 using MiNET.Utils.Vectors;
-
+using SharpAvi;
+using SharpAvi.Output;
+using SixLabors.Fonts;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using Color = System.Drawing.Color;
 
 namespace MiNET.Worlds
@@ -109,9 +122,18 @@ namespace MiNET.Worlds
 
 	public class SkyLightCalculations
 	{
+		private static FontCollection _fontCollection;
+		private static Font _font = null;
 
 		static SkyLightCalculations()
 		{
+			_fontCollection = new FontCollection();
+			_fontCollection.AddSystemFonts();
+
+			if (_fontCollection.TryGet("Arial", out var family))
+			{
+				_font = family.CreateFont(9);
+			}
 		}
 		
 		private static readonly ILog Log = LogManager.GetLogger(typeof(SkyLightCalculations));
@@ -129,6 +151,110 @@ namespace MiNET.Worlds
 		public SkyLightCalculations(bool trackResults = false)
 		{
 			TrackResults = trackResults;
+		}
+
+		public static void Calculate(Level level)
+		{
+			var chunks = level.GetLoadedChunks().OrderBy(column => column.X).ThenBy(column => column.Z);
+			SkyLightBlockAccess blockAccess = new SkyLightBlockAccess(level.WorldProvider);
+
+			_chunkCount = chunks.Count();
+
+			if (_chunkCount == 0) return;
+
+			CheckIfSpawnIsMiddle(chunks, level.SpawnPoint.GetCoordinates3D());
+
+			Stopwatch sw = new Stopwatch();
+			sw.Start();
+
+			//Parallel.ForEach(chunks, chunk => chunk.RecalcHeight());
+
+			//Log.Debug($"Recalc height level {level.LevelName}({level.LevelId}) for {_chunkCount} chunks, {_chunkCount*16*16*256} blocks. Time {sw.ElapsedMilliseconds}ms");
+
+			SkyLightCalculations calculator = new SkyLightCalculations(Config.GetProperty("CalculateLights.MakeMovie", false));
+
+			int midX = calculator.GetMidX(chunks.ToArray());
+			//int width = calculator.GetWidth(chunks.ToArray());
+
+			sw.Restart();
+
+			HighPrecisionTimer tickerHighPrecisionTimer = null;
+			if (calculator.TrackResults) tickerHighPrecisionTimer = new HighPrecisionTimer(100, _ => calculator.SnapshotVisits(), highPrecision: false);
+
+			calculator.StartTimeInMilliseconds = Environment.TickCount;
+
+			var t0 = Task.Run(() =>
+			{
+				var pairs = chunks.OrderBy(pair => pair.X).ThenBy(pair => pair.Z).Where(chunk => chunk.X <= midX).OrderByDescending(pair => pair.X).ThenBy(pair => pair.Z).ToArray();
+				calculator.CalculateSkyLights(blockAccess, pairs);
+			});
+
+			var t5 = Task.Run(() =>
+			{
+				var pairs = chunks.OrderByDescending(pair => pair.X).ThenBy(pair => pair.Z).Where(chunk => chunk.X > midX).OrderBy(pair => pair.X).ThenByDescending(pair => pair.Z).ToArray();
+				calculator.CalculateSkyLights(blockAccess, pairs);
+			});
+
+			var t1 = Task.Run(() =>
+			{
+				var pairs = chunks.OrderBy(pair => pair.X).ThenBy(pair => pair.Z).ToArray();
+				calculator.CalculateSkyLights(blockAccess, pairs);
+			});
+
+			var t2 = Task.Run(() =>
+			{
+				var pairs = chunks.OrderByDescending(pair => pair.X).ThenByDescending(pair => pair.Z).ToArray();
+				calculator.CalculateSkyLights(blockAccess, pairs);
+			});
+
+			var t3 = Task.Run(() =>
+			{
+				var pairs = chunks.OrderByDescending(pair => pair.X).ThenBy(pair => pair.Z).ToArray();
+				calculator.CalculateSkyLights(blockAccess, pairs);
+			});
+
+			var t4 = Task.Run(() =>
+			{
+				var pairs = chunks.OrderBy(pair => pair.X).ThenByDescending(pair => pair.Z).ToArray();
+				calculator.CalculateSkyLights(blockAccess, pairs);
+			});
+
+			Task.WaitAll(t0, t1, t2, t3, t4, t5);
+
+			Log.Debug($"Recalc skylight for {_chunkCount:N0} chunks, {_chunkCount * 16 * 16 * 256:N0} blocks. Touches={calculator.visits:N0} Time {sw.ElapsedMilliseconds:N0}ms");
+
+			if (calculator.TrackResults)
+			{
+				Task.Run(() =>
+				{
+					tickerHighPrecisionTimer?.Dispose();
+					calculator.SnapshotVisits();
+					calculator.SnapshotVisits();
+
+					if (calculator.RenderingTasks.Count == 0) return;
+
+					// Start with an end-frame (twitter thumbs)
+					var last = calculator.RenderingTasks.Last();
+					calculator.RenderingTasks.Remove(last);
+					calculator.RenderingTasks.Insert(0, last);
+
+					calculator.RenderVideo();
+
+					Log.Debug($"Movie rendered.");
+				});
+			}
+
+			//foreach (var chunk in chunks)
+			//{
+			//	calculator.ShowHeights(chunk);
+			//}
+
+			//var chunkColumn = chunks.First(column => column.x == -1 && column.z == 0 );
+			//if (chunkColumn != null)
+			//{
+			//	Log.Debug($"Heights:\n{Package.HexDump(chunkColumn.height)}");
+			//	Log.Debug($"skylight.Data:\n{Package.HexDump(chunkColumn.skyLight.Data, 64)}");
+			//}
 		}
 
 		public int CalculateSkyLights(IBlockAccess level, ChunkColumn[] chunks)
@@ -487,8 +613,13 @@ namespace MiNET.Worlds
 		{
 			if (chunk == null) return true;
 
-			int bid = chunk.GetBlockId(blockCoordinates.X & 0x0f, blockCoordinates.Y, blockCoordinates.Z & 0x0f);
-			return bid == 0 || (BlockFactory.TransparentBlocks[bid] == 1 && bid != 18 && bid != 161 && bid != 30 && bid != 8 && bid != 9);
+			int bid = chunk.GetBlockRuntimeId(blockCoordinates.X & 0x0f, blockCoordinates.Y, blockCoordinates.Z & 0x0f);
+			return BlockFactory.IsBlock<Air>(bid) 
+				|| (BlockFactory.TransparentBlocks[bid] == 1 
+				&& !BlockFactory.IsBlock<LeavesBase>(bid)
+				&& !BlockFactory.IsBlock<Web>(bid)
+				&& !BlockFactory.IsBlock<FlowingWater>(bid) 
+				&& !BlockFactory.IsBlock<Water>(bid));
 		}
 
 		public static int GetDiffuseLevel(BlockCoordinates blockCoordinates, SubChunk section)
@@ -500,8 +631,12 @@ namespace MiNET.Worlds
 			int by = blockCoordinates.Y;
 			int bz = blockCoordinates.Z & 0x0f;
 
-			int bid = section.GetBlockId(bx, by - 16 * (by >> 4), bz);
-			return bid == 8 || bid == 9 ? 3 : bid == 18 || bid == 161 || bid == 30 ? 2 : 1;
+			int bid = section.GetBlockRuntimeId(bx, by - 16 * (by >> 4), bz);
+			return BlockFactory.IsBlock<FlowingWater>(bid) || BlockFactory.IsBlock<Water>(bid) 
+				? 3 
+				: BlockFactory.IsBlock<LeavesBase>(bid) || BlockFactory.IsBlock<Web>(bid)
+					? 2 
+					: 1;
 		}
 
 		public static bool IsTransparent(BlockCoordinates blockCoordinates, SubChunk section)
@@ -512,8 +647,8 @@ namespace MiNET.Worlds
 			int by = blockCoordinates.Y;
 			int bz = blockCoordinates.Z & 0x0f;
 
-			int bid = section.GetBlockId(bx, by - 16 * (by >> 4), bz);
-			return bid == 0 || BlockFactory.TransparentBlocks[bid] == 1;
+			int bid = section.GetBlockRuntimeId(bx, by - 16 * (by >> 4), bz);
+			return BlockFactory.IsBlock<Air>(bid) || BlockFactory.TransparentBlocks[bid] == 1;
 		}
 
 		public static byte GetSkyLight(BlockCoordinates blockCoordinates, SubChunk chunk)
@@ -573,6 +708,147 @@ namespace MiNET.Worlds
 			if (zm == (int) spawnPoint.Z >> 4 && xm == (int) spawnPoint.X >> 4) Log.Warn($"Spawn correct {xm}, {zm} and {(int) spawnPoint.X >> 4}, {(int) spawnPoint.Z >> 4}");
 		}
 
+		private object _imageSync = new object();
+		private static int _chunkCount;
+
+		public List<Task<Image>> RenderingTasks { get; } = new List<Task<Image>>();
+
+		public void SnapshotVisits()
+		{
+			lock (_imageSync)
+			{
+				if (!TrackResults) return;
+
+				var visits1 = Visits.ToArray();
+
+				if (visits1.Length == 0) return;
+
+				long time = Environment.TickCount;
+
+				Task<Image> t = new Task<Image>(v =>
+				{
+					var fileId = time;
+
+					try
+					{
+						var visits = v as KeyValuePair<BlockCoordinates, int>[];
+
+						int valMax = Visits.MaxBy(kvp => kvp.Value).Value;
+						int valMin = visits.MinBy(kvp => kvp.Value).Value;
+
+						int xMin = visits.MinBy(kvp => kvp.Key.X).Key.X;
+						int xMax = visits.MaxBy(kvp => kvp.Key.X).Key.X;
+						int xd = Math.Abs(xMax - xMin);
+
+						int zMin = visits.MinBy(kvp => kvp.Key.Z).Key.Z;
+						int zMax = visits.MaxBy(kvp => kvp.Key.Z).Key.Z;
+						int zd = Math.Abs(zMax - zMin);
+
+						int zMov = zMin < 0 ? Math.Abs(zMin) : zMin * -1;
+						int xMov = xMin < 0 ? Math.Abs(xMin) : xMin * -1;
+
+						//Bitmap bitmap = new Bitmap(xd + 1, zd + 1, PixelFormat.Format32bppArgb);
+						var bitmap = new Image<Rgba32>(GetWidth(), GetHeight()); // new Bitmap(GetWidth(), GetHeight(), PixelFormat.Format32bppArgb);
+
+						foreach (var visit in visits)
+						{
+							try
+							{
+								double logBase = 4;
+								double min = Math.Abs(Math.Ceiling(Math.Log(1, logBase)));
+
+								if (visit.Value == 0) continue;
+								//bitmap.SetPixel(visit.Key.X + xMov, visit.Key.Z + zMov, new ColorHeatMap().GetColorForValue(visit.Value, valMax));
+								bitmap[visit.Key.X + xMov, visit.Key.Z + zMov] = new ColorHeatMap().GetColorForValue(Math.Log(visit.Value, logBase) + min, Math.Log(valMax, logBase) + min);
+								//bitmap.SetPixel(visit.Key.X + xMov, visit.Key.Z + zMov, CreateHeatColor(Math.Log(visit.Value, logBase) + min, Math.Log(valMax, logBase) + min));
+								//bitmap.SetPixel(visit.Key.X + xMov, visit.Key.Z + zMov, CreateHeatColor(Math.Log(visit.Value + 3), Math.Log(valMax + 3)));
+								//bitmap.SetPixel(visit.Key.X + xMov, visit.Key.Z + zMov, CreateHeatColor(Math.Pow(visit.Value, 10), Math.Pow(valMax, 10)));
+								//bitmap.SetPixel(visit.Key.X + xMov, visit.Key.Z + zMov, CreateHeatColor(visit.Value, valMax));
+							}
+							catch (Exception e)
+							{
+								Log.Error($"{xd}, {zd}, {xMin}, {zMin}, {xMax}, {zMax}, X={visit.Key.X}, Z={visit.Key.Z}, {xMov}, {zMov}", e);
+
+								break;
+							}
+						}
+						//byte[] bytes = new byte[xd*zd*4];
+						//int i = 0;
+						//for (int x = 0; x < xd; x++)
+						//{
+						//    for (int z = 0; z < zd; z++)
+						//    {
+						//        bytes[i++*4] = image[x, z];
+						//    }
+						//}
+
+
+						//var interval = valMax/zd;
+						//for (int i = 0; i < zd; i++)
+						//{
+						//    //var value = (i * interval) + 3;
+						//    //var max = valMax;
+						//    var value = Math.Log((i*interval) + 3);
+						//    var max = Math.Log(valMax);
+
+						//    bitmap.SetPixel(0, i, CreateHeatColor((int) value, (decimal) max));
+						//    bitmap.SetPixel(1, i, CreateHeatColor((int) value, (decimal) max));
+						//}
+
+
+						//using (Graphics g = Graphics.FromImage(bitmap))
+						//{
+						//    int tz = 0;
+						//    for (int i = 10 - 1; i >= 0; i--)
+						//    {
+						//        var d = i*(valMax/10);
+						//        g.DrawString($"{d}={Math.Log(d) :##.00}", new Font("Arial", 8), new SolidBrush(Color.White), 2, (tz++)*zd/10f); // requires font, brush etc
+						//    }
+						//}
+
+						if (_font != null)
+						{
+
+							bitmap.Mutate(
+								x =>
+								{
+									x.DrawText($"MiNET skylight calculation\nTime (ms): {fileId - StartTimeInMilliseconds:N0}\n{_chunkCount:N0} chunks with {(_chunkCount * 16 * 16 * 256):N0} blocks\n{visits.Sum(pair => pair.Value):N0} visits", _font, new SolidBrush(SixLabors.ImageSharp.Color.Black), new PointF(1, 0));
+								});
+						}
+						/*using (Graphics g = Graphics.FromImage(bitmap))
+						{
+							g.DrawString(, new Font("Arial", 8), new SolidBrush(Color.White), 1, 0); // requires font, brush etc
+						}*/
+
+						//Directory.CreateDirectory(@"D:\Temp\Light\");
+
+						//lock (_imageSync)
+						//{
+						//	bitmap.Save(@"D:\Temp\Light\test-" + $"{fileId :00000}.bmp", ImageFormat.Bmp);
+						//}
+
+						//bitmap.Dispose();
+						//GC.Collect();
+
+						//foreach (var visit in visits)
+						//{
+						//	Log.Debug($"Visit {visit.Key} {visit.Value} times");
+						//}
+
+						Log.Debug($"Made a total of {visits.Sum(pair => pair.Value):N0} visits");
+						return bitmap;
+					}
+					catch (Exception e)
+					{
+						Log.Error("Rendering", e);
+					}
+
+					return null;
+				}, visits1);
+				RenderingTasks.Add(t);
+			}
+		}
+
 		private int GetMidX(ChunkColumn[] chunks)
 		{
 			if (!TrackResults) return 0;
@@ -625,6 +901,92 @@ namespace MiNET.Worlds
 			return zd + 1;
 		}
 
+		private void RenderVideo()
+		{
+			try
+			{
+				if (!TrackResults) return;
+
+
+				var moviePath = @"D:\Temp\Light\test.avi";
+				Log.Debug($"Generated all images, now rendering movie to {moviePath}");
+
+				//var files = Directory.EnumerateFiles(@"D:\Temp\Light\", "*.bmp");
+				//files = files.OrderBy(s => s);
+
+				//int fps = (int) (RenderingTasks.Count()/10f); // Movie should last 5 seconds
+				int fps = 10;
+
+				var writer = new AviWriter(moviePath)
+				{
+					FramesPerSecond = fps,
+					// Emitting AVI v1 index in addition to OpenDML index (AVI v2)
+					// improves compatibility with some software, including 
+					// standard Windows programs like Media Player and File Explorer
+					EmitIndex1 = true
+				};
+
+				var stream = writer.AddVideoStream();
+				stream.Width = GetWidth();
+				stream.Height = GetHeight();
+				stream.Codec = CodecIds.Uncompressed;
+
+				stream.BitsPerPixel = BitsPerPixel.Bpp32;
+
+				Log.Debug($"Waiting for image rendering of {RenderingTasks.Count} images to complete");
+				foreach (var renderingTask in RenderingTasks)
+				{
+					renderingTask.RunSynchronously();
+					var image = renderingTask.Result;
+					//}
+
+					//foreach (var file in files)
+					//{
+					lock (_imageSync)
+					{
+						//Bitmap image = (Bitmap) Image.FromFile(file);
+						//image = new Bitmap(image, stream.Width, stream.Height);
+
+						byte[] imageData = (byte[]) ToByteArray(image, PngFormat.Instance);
+
+						if (imageData == null)
+						{
+							Log.Warn($"No image data for file.");
+							continue;
+						}
+
+						if (imageData.Length != stream.Height * stream.Width * 4)
+						{
+							imageData = imageData.Skip(imageData.Length - (stream.Height * stream.Width * 4)).ToArray();
+						}
+
+						// fill frameData with image
+
+						// write data to a frame
+						stream.WriteFrame(true, // is key frame? (many codecs use concept of key frames, for others - all frames are keys)
+							imageData, // array with frame data
+							0, // starting index in the array
+							imageData.Length // length of the data
+						);
+					}
+				}
+
+				writer.Close();
+			}
+			catch (Exception e)
+			{
+				Log.Error("Rendering movie", e);
+			}
+		}
+
+		public static byte[] ToByteArray(Image image, IImageFormat imageFormat)
+		{
+			using (MemoryStream ms = new MemoryStream())
+			{
+				image.Save(ms, imageFormat);
+				return ms.ToArray();
+			}
+		}
 
 		static Color CreateHeatColor(double value, double max)
 		{
@@ -731,5 +1093,71 @@ namespace MiNET.Worlds
 				}
 			}
 		}
+	}
+
+	public class ColorHeatMap
+	{
+		private static readonly ILog Log = LogManager.GetLogger(typeof(ColorHeatMap));
+
+		public ColorHeatMap()
+		{
+			InitColorsBlocks();
+		}
+
+		public ColorHeatMap(byte alpha)
+		{
+			this.Alpha = alpha;
+			InitColorsBlocks();
+		}
+
+		private void InitColorsBlocks()
+		{
+			ColorsOfMap.AddRange(new Rgba32[]
+			{
+				new Rgba32(0, 0, 0, Alpha), //Black
+				new Rgba32(0, 0, 0xFF, Alpha), //Blue
+				new Rgba32(0, 0xFF, 0xFF, Alpha), //Cyan
+				new Rgba32(0, 0xFF, 0, Alpha), //Green
+				new Rgba32(0xFF, 0xFF, 0, Alpha), //Yellow
+				new Rgba32(0xFF, 0, 0, Alpha), //Red
+				new Rgba32(0xFF, 0xFF, 0xFF, Alpha), //White
+			});
+		}
+
+		public Rgba32 GetColorForValue(double val, double maxVal)
+		{
+			double valPerc = val / maxVal; // value%
+			if (valPerc < 0) valPerc = 0.1;
+			if (valPerc > 1.0) valPerc = 1;
+			double colorPerc = 1d / (ColorsOfMap.Count - 2); // % of each block of color. the last is the "100% Color"
+			double blockOfColor = valPerc / colorPerc; // the integer part repersents how many block to skip
+			int blockIdx = (int) Math.Truncate(blockOfColor); // Idx of 
+			double valPercResidual = valPerc - (blockIdx * colorPerc); //remove the part represented of block 
+			double percOfColor = valPercResidual / colorPerc; // % of color of this block that will be filled
+
+			var cTarget = ColorsOfMap[blockIdx];
+			var cNext = ColorsOfMap[blockIdx + 1];
+
+			var deltaR = cNext.R - cTarget.R;
+			var deltaG = cNext.G - cTarget.G;
+			var deltaB = cNext.B - cTarget.B;
+
+			var R = cTarget.R + (deltaR * percOfColor);
+			var G = cTarget.G + (deltaG * percOfColor);
+			var B = cTarget.B + (deltaB * percOfColor);
+
+			Rgba32 c = ColorsOfMap[0];
+			try
+			{
+				c = new Rgba32((byte) R, (byte) G, (byte) B, Alpha);// Color.FromArgb(Alpha, (byte) R, (byte) G, (byte) B);
+			}
+			catch (Exception)
+			{
+			}
+			return c;
+		}
+
+		public byte Alpha = 0xff;
+		public List<Rgba32> ColorsOfMap = new List<Rgba32>();
 	}
 }

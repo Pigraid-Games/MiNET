@@ -26,6 +26,7 @@
 using System.Numerics;
 using log4net;
 using MiNET.BlockEntities;
+using MiNET.Blocks.States;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -35,7 +36,9 @@ namespace MiNET.Blocks
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(ChestBase));
 
-		public ChestBase(byte id) : base(id)
+		public abstract CardinalDirection CardinalDirection { get; set; }
+
+		public ChestBase() : base()
 		{
 			FuelEfficiency = 15;
 			IsTransparent = true;
@@ -44,13 +47,38 @@ namespace MiNET.Blocks
 		}
 
 
-		/*public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			var chestBlockEntity = new ChestBlockEntity {Coordinates = Coordinates};
-			world.SetBlockEntity(chestBlockEntity);
+			CardinalDirection = player.KnownPosition.GetDirection();
+
+			var blockEntity = new ChestBlockEntity();
+			blockEntity.Coordinates = Coordinates;
+
+			foreach (var coords in Coordinates.Get2dAroundCoordinates())
+			{
+				var pairBlock = world.GetBlock(coords);
+
+				if (pairBlock is ChestBase chest 
+					&& pairBlock.Id == Id
+					&& CardinalDirection == chest.CardinalDirection)
+				{
+					var pairBlockEntity = world.GetBlockEntity(coords);
+
+					if (pairBlockEntity is ChestBlockEntity pairChestBlockEntity 
+						&& pairChestBlockEntity.Pair(world, blockEntity))
+					{
+						world.SetBlockEntity(blockEntity);
+						world.SetBlockEntity(pairChestBlockEntity);
+
+						return false;
+					}
+				}
+			}
+
+			world.SetBlockEntity(blockEntity);
 
 			return false;
-		}*/
+		}
 
 		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
 		{

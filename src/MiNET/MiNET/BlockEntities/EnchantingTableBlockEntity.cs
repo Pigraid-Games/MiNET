@@ -1,4 +1,4 @@
-#region LICENSE
+﻿#region LICENSE
 
 // The contents of this file are subject to the Common Public Attribution
 // License Version 1.0. (the "License"); you may not use this file except in
@@ -23,81 +23,19 @@
 
 #endregion
 
-using fNbt;
+using fNbt.Serialization;
+using MiNET.Utils;
 
 namespace MiNET.BlockEntities
 {
-	public class EnchantingTableBlockEntity : BlockEntity
+	public class EnchantingTableBlockEntity : ContainerBlockEntityBase
 	{
-		private NbtCompound Compound { get; set; }
+		[NbtProperty("rott")]
+		public float BookRotation { get; set; }
 
-		public EnchantingTableBlockEntity() : base("EnchantTable")
+		public EnchantingTableBlockEntity() : base(BlockEntityIds.EnchantTable, 2, WindowType.Enchantment)
 		{
-			Compound = new NbtCompound(string.Empty)
-			{
-				new NbtString("id", Id),
-				new NbtList("Items", new NbtCompound()),
-				new NbtInt("x", Coordinates.X),
-				new NbtInt("y", Coordinates.Y),
-				new NbtInt("z", Coordinates.Z)
-			};
 
-			NbtList items = (NbtList) Compound["Items"];
-			//for (byte i = 0; i < 2; i++)
-			//{
-			//	items.Add(new NbtCompound()
-			//	{
-			//		new NbtByte("Count", 0),
-			//		new NbtByte("Slot", i),
-			//		new NbtShort("id", 0),
-			//		new NbtByte("Damage", 0),
-			//	});
-			//}
-
-			items.Add(new NbtCompound()
-			{
-				new NbtByte("Count", 0),
-				new NbtByte("Slot", 0),
-				new NbtShort("id", 0),
-				new NbtShort("Damage", 0),
-			});
-			items.Add(new NbtCompound()
-			{
-				new NbtByte("Count", 0),
-				new NbtByte("Slot", 1),
-				new NbtShort("id", 0),
-				new NbtShort("Damage", 0),
-			});
-		}
-
-		public override NbtCompound GetCompound()
-		{
-			Compound["x"] = new NbtInt("x", Coordinates.X);
-			Compound["y"] = new NbtInt("y", Coordinates.Y);
-			Compound["z"] = new NbtInt("z", Coordinates.Z);
-
-			return Compound;
-		}
-
-		public override void SetCompound(NbtCompound compound)
-		{
-			Compound = compound;
-
-			if (Compound["Items"] == null)
-			{
-				NbtList items = new NbtList("Items");
-				for (byte i = 0; i < 2; i++)
-				{
-					items.Add(new NbtCompound()
-					{
-						new NbtByte("Count", 0),
-						new NbtByte("Slot", i),
-						new NbtShort("id", 0),
-						new NbtShort("Damage", 0),
-					});
-				}
-				Compound["Items"] = items;
-			}
 		}
 	}
 }

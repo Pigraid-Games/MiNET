@@ -25,25 +25,21 @@
 
 using System;
 using MiNET.Items;
+using MiNET.Worlds;
 
 namespace MiNET.Blocks
 {
 	public partial class QuartzOre : Block
 	{
-		public QuartzOre() : base(153)
+		public QuartzOre() : base()
 		{
 			BlastResistance = 15;
 			Hardness = 3;
 		}
 
-		public override Item[] GetDrops(Item tool)
+		public override Item[] GetDrops(Level world, Item tool)
 		{
-			return new[] {ItemFactory.GetItem(406, 0, 1)};
-		}
-
-		public override Item GetSmelt()
-		{
-			return new ItemQuartz();
+			return new[] { new ItemQuartz() };
 		}
 
 		public override float GetExperiencePoints()

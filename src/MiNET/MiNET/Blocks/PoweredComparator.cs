@@ -24,23 +24,13 @@
 #endregion
 
 
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-using System.Numerics;
-
 namespace MiNET.Blocks
 {
 	public partial class PoweredComparator : ComparatorBase
 	{
-		public PoweredComparator() : base(150)
+		public PoweredComparator() : base()
 		{
 			LightLevel = 7;
 		}
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			Direction = player.GetCardinalDirection();
-			return false;
-		}
-
 	}
 }

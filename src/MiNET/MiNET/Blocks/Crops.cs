@@ -27,7 +27,6 @@ using System;
 using System.Numerics;
 using log4net;
 using MiNET.Items;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -37,11 +36,11 @@ namespace MiNET.Blocks
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(Crops));
 
-		[StateRange(0, 7)] public virtual int Growth { get; set; } = 0;
+		public abstract int Growth { get; set; }
 
-		protected byte MaxGrowth { get; set; } = 7;
+		protected int MaxGrowth { get; set; } = Blocks.States.Growth.MaxValue;
 
-		protected Crops(byte id) : base(id)
+		protected Crops() : base()
 		{
 			IsSolid = false;
 			IsTransparent = true;

@@ -23,33 +23,14 @@
 
 #endregion
 
-using MiNET.Items;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-using System.Numerics;
-
 namespace MiNET.Blocks
 {
 	public partial class EndRod : Block
 	{
-		public EndRod() : base(208)
+		public EndRod() : base()
 		{
 			LightLevel = 14;
-		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			FacingDirection = ItemBlock.GetFacingDirectionFromEntity(player);
-			if (face == BlockFace.Up)
-			{
-				FacingDirection = 1;
-			}
-			if (face == BlockFace.Down)
-			{
-				FacingDirection = 0;
-			}
-
-			return false;
+			IsTransparent = true;
 		}
 	}
 }

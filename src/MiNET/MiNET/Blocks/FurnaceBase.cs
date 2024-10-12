@@ -25,6 +25,7 @@
 
 using System.Numerics;
 using MiNET.BlockEntities;
+using MiNET.Blocks.States;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -32,7 +33,9 @@ namespace MiNET.Blocks
 {
 	public abstract class FurnaceBase : Block
 	{
-		protected FurnaceBase(byte id) : base(id)
+		public abstract CardinalDirection CardinalDirection { get; set; }
+
+		protected FurnaceBase()
 		{
 			BlastResistance = 17.5f;
 			Hardness = 3.5f;
@@ -40,8 +43,10 @@ namespace MiNET.Blocks
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			var furnaceBlockEntity = new FurnaceBlockEntity {Coordinates = Coordinates};
-			world.SetBlockEntity(furnaceBlockEntity);
+			CardinalDirection = player.KnownPosition.GetDirection();
+
+			var blockEntity = CreateBlockEntity();
+			world.SetBlockEntity(blockEntity);
 
 			return false;
 		}
@@ -51,6 +56,11 @@ namespace MiNET.Blocks
 			player.OpenInventory(blockCoordinates);
 
 			return true;
+		}
+
+		protected virtual BlockEntity CreateBlockEntity()
+		{
+			return new FurnaceBlockEntity { Coordinates = Coordinates };
 		}
 	}
 }

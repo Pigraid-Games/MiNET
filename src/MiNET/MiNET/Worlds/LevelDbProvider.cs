@@ -38,14 +38,15 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using fNbt;
+using fNbt.Serialization;
 using log4net;
+using MiNET.BlockEntities;
 using MiNET.Blocks;
-using MiNET.Items;
 using MiNET.LevelDB;
 using MiNET.Utils;
 using MiNET.Utils.IO;
 using MiNET.Utils.Vectors;
-using Org.BouncyCastle.Asn1.Cms;
+using MiNET.Worlds.Utils;
 
 namespace MiNET.Worlds
 {
@@ -57,7 +58,6 @@ namespace MiNET.Worlds
 		public Database Db { get; private set; }
 
 		public string BasePath { get; private set; }
-
 		public LevelInfoBedrock LevelInfo { get; private set; }
 		public bool IsCaching { get; } = true;
 		public bool Locked { get; set; } = false;
@@ -76,14 +76,12 @@ namespace MiNET.Worlds
 
 		public void Initialize()
 		{
-			BasePath ??= Config.GetProperty("WorldDirectory", "Worlds").Trim();
-			var pluginDir = Config.GetProperty("PluginDirectory", "Plugins").Trim();
-			var resourceDir = Config.GetProperty("ResourceDirectory", "ResourcePacks").Trim();
+			BasePath ??= Config.GetProperty("LevelDBWorldFolder", "World").Trim();
 
 			var directory = new DirectoryInfo(Path.Combine(BasePath, "db"));
 
 			var levelFileName = Path.Combine(BasePath, "level.dat");
-			Log.Warn($"Loading level.dat from {levelFileName}");
+			Log.Debug($"Loading level.dat from {levelFileName}");
 			if (File.Exists(levelFileName))
 			{
 				var file = new NbtFile
@@ -102,19 +100,6 @@ namespace MiNET.Worlds
 			{
 				Log.Warn($"No level.dat found at {levelFileName}. Creating empty.");
 				LevelInfo = new LevelInfoBedrock();
-				if (!Directory.Exists(BasePath))
-				{
-					Directory.CreateDirectory(BasePath);
-				}
-				if (!Directory.Exists(pluginDir))
-				{
-					Directory.CreateDirectory(pluginDir);
-				}
-				if (!Directory.Exists(resourceDir))
-				{
-					Directory.CreateDirectory(resourceDir);
-				}
-				SaveLevelInfo(LevelInfo);
 			}
 
 			// We must reuse the same DB for all providers (dimensions) in LevelDB.
@@ -192,12 +177,12 @@ namespace MiNET.Worlds
 
 					if (sectionBytes == null)
 					{
-						chunkColumn[y]?.PutPool();
+						chunkColumn[y]?.Dispose();
 						chunkColumn[y] = null;
 						continue;
 					}
 
-					ParseSection(chunkColumn[y], sectionBytes);
+					ParseSection(chunkColumn[4 + y], sectionBytes); //Offset by 4 because of 1.18 world update.
 				}
 
 				// Biomes
@@ -206,8 +191,10 @@ namespace MiNET.Worlds
 				sw.Stop();
 				if (flatDataBytes != null)
 				{
-					Buffer.BlockCopy(flatDataBytes.AsSpan().Slice(0, 512).ToArray(), 0, chunkColumn.height, 0, 512);
-					chunkColumn.biomeId = flatDataBytes.AsSpan().Slice(512, 256).ToArray();
+					Buffer.BlockCopy(flatDataBytes.AsSpan().Slice(0, 512).ToArray(), 0, chunkColumn._height, 0, 512);
+
+					// TODO - 1.20 - update
+					//chunkColumn.biomeId = flatDataBytes.AsSpan().Slice(512, 256).ToArray();
 				}
 
 				// Block entities
@@ -223,20 +210,17 @@ namespace MiNET.Worlds
 
 					var file = new NbtFile
 					{
-						BigEndian = false,
-						UseVarInt = false
+						Flavor = NbtFlavor.BedrockNoVarInt
 					};
 					int position = 0;
 					do
 					{
 						position += (int) file.LoadFromStream(new MemoryStreamReader(data.Slice(position)), NbtCompression.None);
 
-						NbtTag blockEntityTag = file.RootTag;
-						int x = blockEntityTag["x"].IntValue;
-						int y = blockEntityTag["y"].IntValue;
-						int z = blockEntityTag["z"].IntValue;
+						// TODO - read directly from stream via NbtSerializer
+						var blockEntity = NbtConvert.FromNbt<BlockEntity>(file.RootTag, new() { Flavor = NbtFlavor.BedrockNoVarInt });
 
-						chunkColumn.SetBlockEntity(new BlockCoordinates(x, y, z), (NbtCompound) blockEntityTag);
+						chunkColumn.BlockEntities[blockEntity.Coordinates] = blockEntity;
 					} while (position < data.Length);
 				}
 			}
@@ -251,12 +235,12 @@ namespace MiNET.Worlds
 
 			if (chunkColumn != null)
 			{
-				if (Dimension == Dimension.Overworld && Config.GetProperty("CalculateLights", false))
-				{
-					var blockAccess = new SkyLightBlockAccess(this, chunkColumn);
-					new SkyLightCalculations().RecalcSkyLight(chunkColumn, blockAccess);
-					//TODO: Block lights.
-				}
+				//if (Dimension == Dimension.Overworld && Config.GetProperty("CalculateLights", false))
+				//{
+				//	var blockAccess = new SkyLightBlockAccess(this, chunkColumn);
+				//	new SkyLightCalculations().RecalcSkyLight(chunkColumn, blockAccess);
+				//	//TODO: Block lights.
+				//}
 
 				chunkColumn.IsDirty = false;
 				//chunkColumn.NeedSave = isGenerated;
@@ -277,8 +261,6 @@ namespace MiNET.Worlds
 			int storageSize = reader.ReadByte();
 			for (int storage = 0; storage < storageSize; storage++)
 			{
-				bool isNotLoggedStorage = storage == 0;
-
 				byte paletteAndFlag = (byte) reader.ReadByte();
 				bool isRuntime = (paletteAndFlag & 1) != 0;
 				if (isRuntime) throw new Exception("Can't use runtime for persistent storage.");
@@ -290,8 +272,9 @@ namespace MiNET.Worlds
 				reader.Position += wordCount * 4;
 
 				int paletteSize = reader.ReadInt32();
-				List<int> palette = isNotLoggedStorage ? section.RuntimeIds : section.LoggedRuntimeIds;
-				palette.Clear();
+
+
+				List<int> blockIds = new List<int>();
 				for (int j = 0; j < paletteSize; j++)
 				{
 					var file = new NbtFile
@@ -301,19 +284,24 @@ namespace MiNET.Worlds
 					};
 					file.LoadFromStream(reader, NbtCompression.None);
 					var tag = (NbtCompound) file.RootTag;
-					Block block = BlockFactory.GetBlockByName(tag["name"].StringValue);
+
+					Block block = BlockFactory.GetBlockById(tag["name"].StringValue);
 					if (block != null && block.GetType() != typeof(Block) && !(block is Air))
 					{
 						List<IBlockState> blockState = ReadBlockState(tag);
-						block.SetState(blockState);
+						block.SetStates(blockState);
 					}
 					else
 					{
 						block = new Air();
 					}
-					palette.Add(block.GetRuntimeId());
-					//Log.Error($"dbread raw: {tag["name"].StringValue} / runtime: {block.GetRuntimeId()}");
+
+					blockIds.Add(block.RuntimeId);
 				}
+
+				var container = section.Layers[storage];
+				container.Clear();
+				container.AppendPaletteRange(blockIds);
 
 				long nextStore = reader.Position;
 				reader.Position = blockIndex;
@@ -330,16 +318,9 @@ namespace MiNET.Worlds
 						int x = (position >> 8) & 0xF;
 						int y = position & 0xF;
 						int z = (position >> 4) & 0xF;
-						if (state > palette.Count) Log.Error($"Got wrong state={state} from word. bitsPerBlock={bitsPerBlock}, blocksPerWord={blocksPerWord}, Word={word}");
+						if (state > container.Palette.Count) Log.Error($"Got wrong state={state} from word. bitsPerBlock={bitsPerBlock}, blocksPerWord={blocksPerWord}, Word={word}");
 
-						if (isNotLoggedStorage)
-						{
-							section.SetBlockIndex(x, y, z, (short) state);
-						}
-						else
-						{
-							section.SetLoggedBlockIndex(x, y, z, (byte) state);
-						}
+						section.SetBlockIndex(x, y, z, (ushort) state, storage);
 						position++;
 					}
 				}
@@ -389,12 +370,13 @@ namespace MiNET.Worlds
 		public int SaveChunks()
 		{
 			if (!Config.GetProperty("Save.Enabled", false)) return 0;
+
 			int count = 0;
 			try
 			{
 				lock (_chunkCache)
 				{
-				SaveLevelInfo(LevelInfo);
+					if (Dimension == Dimension.Overworld) SaveLevelInfo(LevelInfo);
 
 					foreach (ChunkColumn chunkColumn in _chunkCache.Values)
 					{
@@ -418,9 +400,9 @@ namespace MiNET.Worlds
 		{
 			levelInfo.LastPlayed = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 			string levelFileName = Path.Combine(BasePath, "level.dat");
-			Log.Warn($"Saving level.dat to {levelFileName}");
+			Log.Debug($"Saving level.dat to {levelFileName}");
 
-			NbtTag nbt = levelInfo.Serialize();
+			var nbt = levelInfo.Serialize();
 
 			var file = new NbtFile
 			{
@@ -461,33 +443,38 @@ namespace MiNET.Worlds
 
 			// Biomes & heights
 			byte[] heightBytes = new byte[512];
-			Buffer.BlockCopy(chunk.height, 0, heightBytes, 0, 512);
-			byte[] data2D = Combine(heightBytes, chunk.biomeId);
+			Buffer.BlockCopy(chunk._height, 0, heightBytes, 0, 512);
+
+			// TODO - 1.20 - update
+			byte[] data2D = Combine(heightBytes, new byte[256]); //Combine(heightBytes, chunk.biomeId);
 			Db.Put(Combine(index, 0x2D), data2D);
 
-			// Block entities
-			foreach (NbtCompound blockEntityNbt in chunk.BlockEntities.Values)
-			{
-				var nbtClone = (NbtCompound) blockEntityNbt.Clone();
-				nbtClone.Name = "";
-
-				var nbt = new NbtFile
-				{
-					BigEndian = false,
-					UseVarInt = false
-				};
-				nbt.RootTag = nbtClone;
-
-				byte[] blockEntity = nbt.SaveToBuffer(NbtCompression.None);
-				Db.Put(Combine(index, 0x31), blockEntity);
-			}
-
-			// Entities  TODO
-			//foreach ()
+			//// Block entities
+			//byte[] blockEntityBytes = Db.Get(Combine(index, 0x31));
+			//if (blockEntityBytes != null)
 			//{
-			//	Db.Put(Combine(index, 0x32), saveToBuffer);
+			//	var data = blockEntityBytes.AsMemory();
+
+			//	var file = new NbtFile
+			//	{
+			//		BigEndian = false,
+			//		UseVarInt = false
+			//	};
+			//	int position = 0;
+			//	do
+			//	{
+			//		position += (int) file.LoadFromStream(new MemoryStreamReader(data.Slice(position)), NbtCompression.None);
+
+			//		NbtTag blockEntityTag = file.RootTag;
+			//		int x = blockEntityTag["x"].IntValue;
+			//		int y = blockEntityTag["y"].IntValue;
+			//		int z = blockEntityTag["z"].IntValue;
+
+			//		chunkColumn.SetBlockEntity(new BlockCoordinates(x, y, z), (NbtCompound) blockEntityTag);
+			//	} while (position < data.Length);
 			//}
-			chunk.IsDirty = false;
+
+			//chunk.IsDirty = false;
 			chunk.NeedSave = false;
 		}
 
@@ -501,101 +488,21 @@ namespace MiNET.Worlds
 
 		public void Write(SubChunk subChunk, MemoryStream stream)
 		{
-			var startPos = stream.Position;
-
 			stream.WriteByte(8); // version
 
-			long storePosition = stream.Position;
-			int numberOfStores = 0;
-			stream.WriteByte((byte) numberOfStores); // storage size
-
-			if (WriteStore(stream, subChunk.Blocks, null, false, subChunk.RuntimeIds))
+			stream.WriteByte((byte) subChunk.Layers.Count);
+			foreach (var layer in subChunk.Layers)
 			{
-				numberOfStores++;
-				if (WriteStore(stream, null, subChunk.LoggedBlocks, false, subChunk.LoggedRuntimeIds))
-				{
-					numberOfStores++;
-				}
+				WriteStore(stream, layer);
 			}
-
-			stream.Position = storePosition;
-			stream.WriteByte((byte) numberOfStores); // storage size
 		}
 
-		internal bool WriteStore(MemoryStream stream, short[] blocks, byte[] loggedBlocks, bool forceWrite, List<int> palette)
+		internal bool WriteStore(MemoryStream stream, PalettedContainer container)
 		{
-			if (palette.Count == 0) return false;
+			stream.WriteByte((byte) ((container.Data.DataProfile.BlockSize << 1) | 0));
+			container.Data.WriteToStream(stream);
 
-			// log2(number of entries) => bits needed to store them
-			int bitsPerBlock = (int) Math.Ceiling(Math.Log(palette.Count, 2));
-
-			switch (bitsPerBlock)
-			{
-				case 0:
-					if (!forceWrite && palette.Contains(0)) return false;
-					bitsPerBlock = 1;
-					break;
-				case 1:
-				case 2:
-				case 3:
-				case 4:
-				case 5:
-				case 6:
-					//Paletted1 = 1,   // 32 blocks per word
-					//Paletted2 = 2,   // 16 blocks per word
-					//Paletted3 = 3,   // 10 blocks and 2 bits of padding per word
-					//Paletted4 = 4,   // 8 blocks per word
-					//Paletted5 = 5,   // 6 blocks and 2 bits of padding per word
-					//Paletted6 = 6,   // 5 blocks and 2 bits of padding per word
-					break;
-				case 7:
-				case 8:
-					//Paletted8 = 8,  // 4 blocks per word
-					bitsPerBlock = 8;
-					break;
-				case int i when i > 8:
-					//Paletted16 = 16, // 2 blocks per word
-					bitsPerBlock = 16;
-					break;
-				default:
-					break;
-			}
-
-			stream.WriteByte((byte) ((bitsPerBlock << 1) | 0));
-
-			int blocksPerWord = (int) Math.Floor(32f / bitsPerBlock); // Floor to remove padding bits
-			int wordsPerChunk = (int) Math.Ceiling(4096f / blocksPerWord);
-
-			uint[] indexes = new uint[wordsPerChunk];
-
-			int position = 0;
-			for (int w = 0; w < wordsPerChunk; w++)
-			{
-				uint word = 0;
-				for (int block = 0; block < blocksPerWord; block++)
-				{
-					if (position >= 4096) continue;
-
-					uint state;
-					if (blocks != null)
-					{
-						state = (uint) blocks[position];
-					}
-					else
-					{
-						state = (uint) loggedBlocks[position];
-					}
-					word |= state << (bitsPerBlock * block);
-
-					position++;
-				}
-				indexes[w] = word;
-			}
-
-			byte[] ba = new byte[indexes.Length * 4];
-			Buffer.BlockCopy(indexes, 0, ba, 0, indexes.Length * 4);
-
-			stream.Write(ba, 0, ba.Length);
+			var palette = container.Palette;
 
 			var count = new byte[4];
 			BinaryPrimitives.WriteInt32LittleEndian(count, palette.Count);
@@ -603,7 +510,7 @@ namespace MiNET.Worlds
 			stream.Write(count);
 			foreach (int runtimeId in palette)
 			{
-				BlockStateContainer blockState = BlockFactory.BlockPalette[runtimeId == -1 ? 0 : runtimeId];
+				var blockState = BlockFactory.BlockPalette[runtimeId];
 				var file = new NbtFile
 				{
 					BigEndian = false,
@@ -616,7 +523,6 @@ namespace MiNET.Worlds
 
 			return true;
 		}
-
 
 		public bool HaveNether()
 		{
@@ -653,7 +559,7 @@ namespace MiNET.Worlds
 						coords.Add(chunkCoordinates);
 				}
 
-				Parallel.ForEach(_chunkCache, (chunkColumn) =>
+				Parallel.ForEach(_chunkCache, (Action<KeyValuePair<ChunkCoordinates, ChunkColumn>>) ((chunkColumn) =>
 				{
 					bool keep = coords.Exists(c => c.DistanceTo(chunkColumn.Key) < maxViewDistance);
 					if (!keep)
@@ -664,13 +570,13 @@ namespace MiNET.Worlds
 						{
 							foreach (var chunk in waste)
 							{
-								chunk.PutPool();
+								chunk.Dispose();
 							}
 						}
 
 						Interlocked.Increment(ref removed);
 					}
-				});
+				}));
 			}
 
 			return removed;
@@ -714,11 +620,11 @@ namespace MiNET.Worlds
 			return states;
 		}
 
-		private static NbtCompound WriteBlockState(BlockStateContainer container)
+		private static NbtCompound WriteBlockState(IBlockStateContainer container)
 		{
 			var tag = new NbtCompound("");
 
-			tag.Add(new NbtString("name", container.Name));
+			tag.Add(new NbtString("name", container.Id));
 			var nbtStates = new NbtCompound("states");
 
 			foreach (IBlockState state in container.States)
@@ -836,7 +742,7 @@ namespace MiNET.Worlds
 		}
 
 
-		public static NbtTag Serialize<T>(this T obj, NbtTag tag = null) where T : new()
+		public static NbtCompound Serialize<T>(this T obj, NbtCompound tag = null) where T : new()
 		{
 			tag ??= new NbtCompound(string.Empty);
 

@@ -29,7 +29,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using fNbt;
+using fNbt.Serialization;
 using log4net;
+using MiNET.BlockEntities;
 using MiNET.Blocks;
 using MiNET.Client;
 using MiNET.Net;
@@ -45,7 +47,7 @@ namespace MiNET.Console
 		private readonly IWorldProvider _worldProvider;
 		private static readonly ILog Log = LogManager.GetLogger(typeof(ChunkGeneratorHandler));
 		private BlockPalette BlockPalette;
-		private HashSet<BlockStateContainer> _internalStates;
+		private HashSet<IBlockStateContainer> _internalStates;
 
 		public ChunkGeneratorHandler(MiNetClient client, IWorldProvider worldProvider) : base(client)
 		{
@@ -77,12 +79,12 @@ namespace MiNET.Console
 			Client.CurrentLocation = new PlayerLocation(Client.SpawnPoint, message.rotation.X, message.rotation.X, message.rotation.Y);
 
 			Client.LevelInfo.LevelName = message.levelId;
-			Client.LevelInfo.Version = 19133;
-			Client.LevelInfo.GameType = message.levelSettings.gamemode;
+			Client.LevelInfo.NbtVersion = 19133;
+			Client.LevelInfo.GameType = message.levelSettings.GameMode;
 
 			BlockPalette = message.blockPalette;
 
-			_internalStates = new HashSet<BlockStateContainer>(BlockFactory.BlockPalette.Values);
+			_internalStates = new HashSet<IBlockStateContainer>(BlockFactory.BlockPalette);
 
 			Log.Info($"Telling server to do 1 chunk radius");
 			var packet = McpeRequestChunkRadius.CreateObject();
@@ -94,14 +96,12 @@ namespace MiNET.Console
 
 		public override void HandleMcpeSetSpawnPosition(McpeSetSpawnPosition message)
 		{
-			Client.SpawnPoint = new Vector3(message.coordinates.X, message.coordinates.Y, message.coordinates.Z);
-			Client.LevelInfo.SpawnX = (int) Client.SpawnPoint.X;
-			Client.LevelInfo.SpawnY = (int) Client.SpawnPoint.Y;
-			Client.LevelInfo.SpawnZ = (int) Client.SpawnPoint.Z;
+			Client.SpawnPoint = (Vector3) message.coordinates;
+			Client.LevelInfo.Spawn = message.coordinates;
 		}
 
 		private ConcurrentDictionary<CachedChunk, object> _futureChunks = new ConcurrentDictionary<CachedChunk, object>();
-		private ConcurrentDictionary<BlockCoordinates, NbtCompound> _futureBlockEntities = new ConcurrentDictionary<BlockCoordinates, NbtCompound>();
+		private ConcurrentDictionary<BlockCoordinates, BlockEntity> _futureBlockEntities = new ConcurrentDictionary<BlockCoordinates, BlockEntity>();
 
 		private class CachedChunk
 		{
@@ -121,17 +121,17 @@ namespace MiNET.Console
 		public override void HandleMcpeBlockEntityData(McpeBlockEntityData message)
 		{
 			BlockCoordinates coordinates = message.coordinates;
-			Nbt nbt = message.namedtag;
+			var blockEntity = NbtConvert.FromNbt<BlockEntity>(message.namedtag.NbtFile.RootTag);
 			ChunkColumn chunk = _worldProvider.GenerateChunkColumn((ChunkCoordinates) coordinates, true);
 			if(chunk == null)
 			{
 				//Log.Warn($"Got block entity for non existing chunk at {coordinates}\n{nbt.NbtFile.RootTag}");
-				_futureBlockEntities.TryAdd(coordinates, (NbtCompound) nbt.NbtFile.RootTag);
+				_futureBlockEntities.TryAdd(coordinates, blockEntity);
 			}
 			else
 			{
 				//Log.Warn($"Got block entity for existing chunk at {coordinates}\n{nbt.NbtFile.RootTag}");
-				chunk.SetBlockEntity(coordinates, (NbtCompound) nbt.NbtFile.RootTag);
+				chunk.BlockEntities[coordinates] = blockEntity;
 			}
 		}
 
@@ -151,7 +151,8 @@ namespace MiNET.Console
 
 					if (chunk.Biome == hash)
 					{
-						chunk.Chunk.biomeId = data;
+						// TODO - 1.20 - update
+						//chunk.Chunk.biomeId = data;
 						chunk.Biome = 0;
 					}
 					else
@@ -172,7 +173,7 @@ namespace MiNET.Console
 						_futureChunks.TryRemove(chunk, out _);
 
 						var coordinates = new ChunkCoordinates(chunk.Chunk.X, chunk.Chunk.Z);
-						foreach (KeyValuePair<BlockCoordinates, NbtCompound> bePair in _futureBlockEntities.Where(be => (ChunkCoordinates) be.Key == coordinates))
+						foreach (var bePair in _futureBlockEntities.Where(be => (ChunkCoordinates) be.Key == coordinates))
 						{
 							chunk.Chunk.BlockEntities.Add(bePair);
 							_futureBlockEntities.TryRemove(bePair.Key, out _);
@@ -203,7 +204,8 @@ namespace MiNET.Console
 				ulong biomeHash = message.blobHashes.Last();
 				if (Client.BlobCache.TryGetValue(biomeHash, out byte[] biomes))
 				{
-					chunk.Chunk.biomeId = biomes;
+					// TODO - 1.20 - update
+					//chunk.Chunk.biomeId = biomes;
 					hits.Add(biomeHash);
 				}
 				else

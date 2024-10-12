@@ -24,14 +24,13 @@
 #endregion
 
 using System;
-using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using log4net;
 using MiNET.Blocks;
-using MiNET.Utils;
+using MiNET.Worlds.Utils;
 
 namespace MiNET.Worlds
 {
@@ -39,213 +38,146 @@ namespace MiNET.Worlds
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(SubChunk));
 
+		public const ushort Size = 16 * 16 * 16;
+
 		private bool _isAllAir = true;
 
-		private List<int> _runtimeIds; // Add air, always as first (performance)
-		internal List<int> RuntimeIds => _runtimeIds;
-
-		private short[] _blocks;
-		internal short[] Blocks => _blocks;
-
-		private List<int> _loggedRuntimeIds = new List<int>();
-		internal List<int> LoggedRuntimeIds => _loggedRuntimeIds;
-
-		private byte[] _loggedBlocks; // We use only byte size on this palette index table, because can basically only be water and snow-levels
-		internal byte[] LoggedBlocks => _loggedBlocks;
+		private List<PalettedContainer> _layers;
+		private PalettedContainer _biomes;
 
 		// Consider disabling these if we don't calculate lights
-		public NibbleArray _blocklight;
-		public NibbleArray _skylight;
+		//private NibbleArray _blockLight;
+		//private NibbleArray _skyLight;
+
+		private byte[] _cache;
+
+		public int X { get; set; }
+		public int Z { get; set; }
+		public int Index { get; set; }
+
+		internal List<PalettedContainer> Layers => _layers;
+		internal virtual PalettedContainer Biomes => _biomes;
+
+		//public NibbleArray BlockLight => _blockLight;
+		//public NibbleArray SkyLight => _skyLight;
 
 		public bool IsDirty { get; private set; }
 
 		public ulong Hash { get; set; }
 		public bool DisableCache { get; set; } = true;
-		private byte[] _cache;
 
-		public SubChunk(bool clearBuffers = true)
+		public SubChunk()
 		{
-			_runtimeIds = new List<int> {(int) BlockFactory.GetBlockByName("minecraft:air").GetRuntimeId()};
-				
-			_blocks = ArrayPool<short>.Shared.Rent(4096);
-			_loggedBlocks = ArrayPool<byte>.Shared.Rent(4096);
-			_blocklight = new NibbleArray(ArrayPool<byte>.Shared.Rent(2048));
-			_skylight = new NibbleArray(ArrayPool<byte>.Shared.Rent(2048));
+			_layers = new List<PalettedContainer>
+			{
+				PalettedContainer.CreateFilledWith(new Air().RuntimeId, Size),
+				PalettedContainer.CreateFilledWith(new Air().RuntimeId, Size) // think it is not required if there is no layer of water or snow in the chunk
+			};
+
+			_biomes = PalettedContainer.CreateFilledWith(1, Size); // plants biome
+
+			//_blockLight = new NibbleArray(ArrayPool<byte>.Shared.Rent(2048));
+			//_skyLight = new NibbleArray(ArrayPool<byte>.Shared.Rent(2048));
+		}
+
+		public SubChunk(int x, int z, int index, bool clearBuffers = true)
+			: this()
+		{
+			X = x;
+			Z = z;
+			Index = index;
 
 			if (clearBuffers) ClearBuffers();
 		}
 
-		public void ClearBuffers()
+		public virtual void ClearBuffers()
 		{
-			Array.Clear(_blocks, 0, 4096);
-			Array.Clear(_loggedBlocks, 0, 4096);
-			Array.Clear(_blocklight.Data, 0, 2048);
-			ChunkColumn.Fill<byte>(_skylight.Data, 0xff);
+			//Array.Clear(_blockLight.Data, 0, 2048);
+			//ChunkColumn.Fill<byte>(_skyLight.Data, 0xff);
 		}
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public bool IsAllAir()
 		{
-			//if (IsDirty)
-			{
-				_isAllAir = AllZeroFast(_blocks);
-			}
-			return _isAllAir;
+			var airRuntimeId = new Air().RuntimeId;
+
+			return _layers.All(layer => layer.Palette.Count <= 1 && layer.Palette.SingleOrDefault(airRuntimeId) == airRuntimeId)
+				&& _biomes.Palette.Count <= 1 && _biomes.Palette.SingleOrDefault(airRuntimeId) == 1; // plants biome
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static unsafe bool AllZeroFast<T>(T[] data) where T : unmanaged
-		{
-			fixed (T* shorts = data)
-			{
-				byte* bytes = (byte*) shorts;
-				int len = data.Length * sizeof(T);
-				int rem = len % (sizeof(long) * 16);
-				long* b = (long*) bytes;
-				long* e = (long*) (shorts + len - rem);
-
-				while (b < e)
-				{
-					if ((*(b)
-						| *(b + 1)
-						| *(b + 2)
-						| *(b + 3)
-						| *(b + 4)
-						| *(b + 5)
-						| *(b + 6)
-						| *(b + 7)
-						| *(b + 8)
-						| *(b + 9)
-						| *(b + 10)
-						| *(b + 11)
-						| *(b + 12)
-						| *(b + 13)
-						| *(b + 14)
-						| *(b + 15)) != 0)
-						return false;
-					b += 16;
-				}
-
-				for (int i = 0; i < rem; i++)
-				{
-					if (data[len - 1 - i].Equals(default(T)))
-						return false;
-				}
-
-				return true;
-			}
-		}
-
-		private static int GetIndex(int bx, int by, int bz)
+		protected static int GetIndex(int bx, int by, int bz)
 		{
 			return (bx << 8) | (bz << 4) | by;
 		}
 
-		public int GetBlockId(int bx, int by, int bz)
+		public int GetBlockRuntimeId(int bx, int by, int bz, int layer = 0)
 		{
-			if (_runtimeIds.Count == 0) return 0;
-
-			int paletteIndex = _blocks[GetIndex(bx, by, bz)];
-			int runtimeId = _runtimeIds[paletteIndex];
-			if (runtimeId == -1) { runtimeId = BlockFactory.GetBlockById(0).GetRuntimeId(); }
-			BlockFactory.BlockPalette.TryGetValue(runtimeId, out BlockStateContainer blockState);
-			int bid = blockState.Id;
-			return bid == -1 ? 0 : bid;
+			return _layers[layer][GetIndex(bx, by, bz)];
 		}
 
-		public Block GetBlockObject(int bx, int @by, int bz)
+		public Block GetBlockObject(int bx, int by, int bz, int layer = 0)
 		{
-			if (_runtimeIds.Count == 0) return new Air();
-
-			int index = _blocks[GetIndex(bx, by, bz)];
-			int runtimeId = _runtimeIds[index];
-			if (runtimeId == -1) { runtimeId = BlockFactory.GetBlockById(0).GetRuntimeId(); }
-			BlockFactory.BlockPalette.TryGetValue(runtimeId, out BlockStateContainer blockState);
-			Block block = BlockFactory.GetBlockById(blockState.Id);
-			block.SetState(blockState.States);
-			block.Metadata = (byte) blockState.Data; //TODO: REMOVE metadata. Not needed.
-
-			return block;
+			return BlockFactory.GetBlockByRuntimeId(GetBlockRuntimeId(bx, by, bz, layer));
 		}
 
-		public void SetBlock(int bx, int by, int bz, Block block)
+		public void SetBlock(int bx, int by, int bz, Block block, int layer = 0)
 		{
-			int runtimeId = block.GetRuntimeId();
+			int runtimeId = block.RuntimeId;
 			if (runtimeId < 0) return;
 
-			SetBlockByRuntimeId(bx, by, bz, runtimeId);
+			SetBlockByRuntimeId(bx, by, bz, runtimeId, layer);
 		}
 
-		public void SetBlockByRuntimeId(int bx, int by, int bz, int runtimeId)
+		public void SetBlockByRuntimeId(int bx, int by, int bz, int runtimeId, int layer = 0)
 		{
-			var paletteIndex = _runtimeIds.IndexOf(runtimeId);
-			if (paletteIndex == -1)
-			{
-				_runtimeIds.Add(runtimeId);
-				paletteIndex = _runtimeIds.IndexOf(runtimeId);
-			}
+			_layers[layer][GetIndex(bx, by, bz)] = runtimeId;
 
-			_blocks[GetIndex(bx, by, bz)] = (short) paletteIndex;
 			_cache = null;
 			IsDirty = true;
 		}
 
-		public void SetBlockIndex(int bx, int by, int bz, short paletteIndex)
+		public void SetBlockIndex(int bx, int by, int bz, ushort paletteIndex, int layer = 0)
 		{
-			_blocks[GetIndex(bx, by, bz)] = paletteIndex;
+			_layers[layer].Data[GetIndex(bx, by, bz)] = paletteIndex;
+
 			_cache = null;
 			IsDirty = true;
 		}
 
-
-		public void SetLoggedBlock(int bx, int by, int bz, Block block)
+		public byte GetBiome(int bx, int by, int bz)
 		{
-			int runtimeId = block.GetRuntimeId();
-			if (runtimeId < 0) return;
-
-			SetLoggedBlockByRuntimeId(bx, by, bz, runtimeId);
+			return (byte) _biomes[GetIndex(bx, by, bz)];
 		}
 
-		public void SetLoggedBlockByRuntimeId(int bx, int by, int bz, int runtimeId)
+		public void SetBiome(int bx, int by, int bz, byte biome)
 		{
-			var paletteIndex = _loggedRuntimeIds.IndexOf(runtimeId);
-			if (paletteIndex == -1)
-			{
-				_loggedRuntimeIds.Add(runtimeId);
-				paletteIndex = (byte) _loggedRuntimeIds.IndexOf(runtimeId);
-			}
-
-			_loggedBlocks[GetIndex(bx, by, bz)] = (byte) paletteIndex;
-			_cache = null;
-			IsDirty = true;
+			_biomes[GetIndex(bx, by, bz)] = biome;
 		}
 
-		public void SetLoggedBlockIndex(int bx, int by, int bz, byte paletteIndex)
-		{
-			_loggedBlocks[GetIndex(bx, by, bz)] = paletteIndex;
-			_cache = null;
-			IsDirty = true;
-		}
-
+		[Obsolete("now disabled")]
 		public byte GetBlocklight(int bx, int by, int bz)
 		{
-			return _blocklight[GetIndex(bx, by, bz)];
+			return 0;//_blockLight[GetIndex(bx, by, bz)];
 		}
 
+		[Obsolete("now disabled")]
 		public void SetBlocklight(int bx, int by, int bz, byte data)
 		{
-			_blocklight[GetIndex(bx, by, bz)] = data;
+			//_blockLight[GetIndex(bx, by, bz)] = data;
 		}
 
+		[Obsolete("now disabled")]
 		public byte GetSkylight(int bx, int by, int bz)
 		{
-			return _skylight[GetIndex(bx, by, bz)];
+			return 0xff;//_skyLight[GetIndex(bx, by, bz)];
 		}
 
+		[Obsolete("now disabled")]
 		public void SetSkylight(int bx, int by, int bz, byte data)
 		{
-			_skylight[GetIndex(bx, by, bz)] = data;
+			//_skyLight[GetIndex(bx, by, bz)] = data;
 		}
 
 		public void Write(MemoryStream stream)
@@ -258,37 +190,9 @@ namespace MiNET.Worlds
 
 			var startPos = stream.Position;
 
-			stream.WriteByte(8); // version
-			
-			int numberOfStores = 0;
-
-			var runtimeIds = _runtimeIds;
-			var blocks = _blocks;
-			
-			if (runtimeIds != null && runtimeIds.Count > 0)
-				numberOfStores++;
-			
-			var loggedRuntimeIds = _loggedRuntimeIds;
-			var loggedBlocks = _loggedBlocks;
-
-			if (loggedRuntimeIds != null && loggedRuntimeIds.Count > 0)
-				numberOfStores++;
-			
-			stream.WriteByte((byte) numberOfStores); // storage size
-			
-			if (WriteStore(stream, blocks, null, false, runtimeIds))
-			{
-				//numberOfStores++;
-				if (WriteStore(stream, null, loggedBlocks, false, loggedRuntimeIds))
-				{
-					//numberOfStores++;
-				}
-			}
+			WriteToStream(stream);
 
 			int length = (int) (stream.Position - startPos);
-
-			//stream.Position = storePosition;
-			//stream.WriteByte((byte) numberOfStores); // storage size
 
 			//if (DisableCache)
 			{
@@ -306,103 +210,31 @@ namespace MiNET.Worlds
 			IsDirty = false;
 		}
 
-		public static bool WriteStore(MemoryStream stream, short[] blocks, byte[] loggedBlocks, bool forceWrite, List<int> palette)
+		public void WriteToStream(MemoryStream stream, bool network = true)
 		{
-			if (palette.Count == 0) return false;
+			stream.WriteByte(8); // version
 
-			// log2(number of entries) => bits needed to store them
-			int bitsPerBlock = (int) Math.Ceiling(Math.Log(palette.Count, 2));
-
-			switch (bitsPerBlock)
+			stream.WriteByte((byte) _layers.Count);
+			foreach (var layer in _layers)
 			{
-				case 0:
-					if (!forceWrite && palette.Contains(0)) return false;
-					bitsPerBlock = 1;
-					break;
-				case 1:
-				case 2:
-				case 3:
-				case 4:
-				case 5:
-				case 6:
-					//Paletted1 = 1,   // 32 blocks per word
-					//Paletted2 = 2,   // 16 blocks per word
-					//Paletted3 = 3,   // 10 blocks and 2 bits of padding per word
-					//Paletted4 = 4,   // 8 blocks per word
-					//Paletted5 = 5,   // 6 blocks and 2 bits of padding per word
-					//Paletted6 = 6,   // 5 blocks and 2 bits of padding per word
-					break;
-				case 7:
-				case 8:
-					//Paletted8 = 8,  // 4 blocks per word
-					bitsPerBlock = 8;
-					break;
-				case int i when i > 8:
-					//Paletted16 = 16, // 2 blocks per word
-					bitsPerBlock = 16;
-					break;
-				default:
-					break;
+				layer.WriteToStream(stream, network);
 			}
-
-			stream.WriteByte((byte) ((bitsPerBlock << 1) | 1)); // flags
-
-			int blocksPerWord = (int) Math.Floor(32f / bitsPerBlock); // Floor to remove padding bits
-			int wordsPerChunk = (int) Math.Ceiling(4096f / blocksPerWord);
-
-			uint[] indexes = new uint[wordsPerChunk];
-
-			int position = 0;
-			for (int w = 0; w < wordsPerChunk; w++)
-			{
-				uint word = 0;
-				for (int block = 0; block < blocksPerWord; block++)
-				{
-					if (position >= 4096)
-						continue;
-
-					uint state;
-					if (blocks != null)
-					{
-						state = (uint) blocks[position];
-					}
-					else
-					{
-						state = (uint) loggedBlocks[position];
-					}
-					word |= state << (bitsPerBlock * block);
-
-					position++;
-				}
-				indexes[w] = word;
-			}
-
-			byte[] ba = new byte[indexes.Length * 4];
-			Buffer.BlockCopy(indexes, 0, ba, 0, indexes.Length * 4);
-
-			stream.Write(ba, 0, ba.Length);
-
-			VarInt.WriteSInt32(stream, palette.Count); // count
-			foreach (var val in palette)
-			{
-				VarInt.WriteSInt32(stream, val);
-			}
-
-			return true;
 		}
 
-		public object Clone()
+		public virtual object Clone()
 		{
-			SubChunk cc = CreateObject();
+			var cc = (SubChunk) Activator.CreateInstance(GetType());
+			cc.X = X;
+			cc.Z = Z;
+			cc.Index = Index;
+
 			cc._isAllAir = _isAllAir;
 			cc.IsDirty = IsDirty;
 
-			cc._runtimeIds = new List<int>(_runtimeIds);
-			_blocks.CopyTo(cc._blocks, 0);
-			cc._loggedRuntimeIds = new List<int>(_loggedRuntimeIds);
-			_loggedBlocks.CopyTo(cc._loggedBlocks, 0);
-			_blocklight.Data.CopyTo(cc._blocklight.Data, 0);
-			_skylight.Data.CopyTo(cc._skylight.Data, 0);
+			cc._layers = _layers.Select(layer => layer.Clone()).Cast<PalettedContainer>().ToList();
+			cc._biomes = (PalettedContainer) _biomes.Clone();
+			//_blockLight.Data.CopyTo(cc._blockLight.Data, 0);
+			//_skyLight.Data.CopyTo(cc._skyLight.Data, 0);
 
 			if (_cache != null)
 			{
@@ -412,89 +244,14 @@ namespace MiNET.Worlds
 			return cc;
 		}
 
-		private static readonly ChunkPool<SubChunk> Pool = new ChunkPool<SubChunk>(() => new SubChunk());
-
-		public static SubChunk CreateObject()
+		public virtual void Dispose()
 		{
-			return new SubChunk();
-			//return Pool.GetObject();
-		}
+			_layers.ForEach(layer => layer.Dispose());
+			_biomes.Dispose();
+			//if (_blockLight != null) ArrayPool<byte>.Shared.Return(_blockLight.Data);
+			//if (_skyLight != null) ArrayPool<byte>.Shared.Return(_skyLight.Data);
 
-		public void PutPool()
-		{
-			Dispose();
-			//Reset();
-			//Pool.PutObject(this);
-		}
-
-		public void REMOVEReset()
-		{
-			_isAllAir = true;
-			_runtimeIds.Clear();
-			Array.Clear(_blocks, 0, _blocks.Length);
-			_loggedRuntimeIds.Clear();
-			Array.Clear(_loggedBlocks, 0, _blocks.Length);
-			Array.Clear(_blocklight.Data, 0, _blocklight.Data.Length);
-			Array.Fill<byte>(_skylight.Data, 0xff);
-			_cache = null;
-			IsDirty = false;
-		}
-
-		private void Dispose(bool disposing)
-		{
-			if (disposing)
-			{
-				if (_blocks != null) ArrayPool<short>.Shared.Return(_blocks);
-				if (_loggedBlocks != null) ArrayPool<byte>.Shared.Return(_loggedBlocks);
-				if (_blocklight != null) ArrayPool<byte>.Shared.Return(_blocklight.Data);
-				if (_skylight != null) ArrayPool<byte>.Shared.Return(_skylight.Data);
-			}
-		}
-
-		public void Dispose()
-		{
-			Dispose(true);
 			GC.SuppressFinalize(this);
-		}
-
-		~SubChunk()
-		{
-			Dispose(false);
-		}
-	}
-
-	public class ChunkPool<T>
-	{
-		private static readonly ILog Log = LogManager.GetLogger(typeof(ChunkPool<T>));
-
-		private ConcurrentQueue<T> _objects;
-
-		private Func<T> _objectGenerator;
-
-		public ChunkPool(Func<T> objectGenerator)
-		{
-			if (objectGenerator == null)
-				throw new ArgumentNullException("objectGenerator");
-			_objects = new ConcurrentQueue<T>();
-			_objectGenerator = objectGenerator;
-		}
-
-		public T GetObject()
-		{
-			if (_objects.IsEmpty)
-				return _objectGenerator();
-
-			T item;
-			if (_objects.TryDequeue(out item))
-				return item;
-			return _objectGenerator();
-		}
-
-		const long MaxPoolSize = 10000000;
-
-		public void PutObject(T item)
-		{
-			//_objects.Enqueue(item);
 		}
 	}
 }

@@ -1,4 +1,4 @@
-#region LICENSE
+﻿#region LICENSE
 
 // The contents of this file are subject to the Common Public Attribution
 // License Version 1.0. (the "License"); you may not use this file except in
@@ -32,6 +32,7 @@ using MiNET.Entities.Projectiles;
 using MiNET.Items;
 using MiNET.Net;
 using MiNET.Utils;
+using MiNET.Utils.Vectors;
 
 namespace MiNET
 {
@@ -92,7 +93,17 @@ namespace MiNET
 				}
 			}
 
-
+			if (item is ItemMace && player.IsFalling)
+			{
+				double startFall = player.StartFallY;
+				double currentY = player.KnownPosition.Y;
+				if ((startFall - currentY) < 2)
+				{
+					return damage + increase;
+				}
+				damage += (startFall - currentY) * 5; // 5 is the additional damage added, per fallen block
+			}
+			
 			return damage + increase; //Item Damage.
 		}
 

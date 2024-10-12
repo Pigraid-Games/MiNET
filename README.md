@@ -1,41 +1,50 @@
+In case you don't find the information you are looking for in the README. Do try the [wiki](https://github.com/NiclasOlofsson/MiNET/wiki)
 
-MiNET (CobwebSMP edition)
+MiNET
 =====
-[![Build status](https://github.com/CobwebSMP/MiNET/actions/workflows/dotnet.yml/badge.svg)](https://github.com/CobwebSMP/MiNET/actions/workflows/dotnet.yml)
-[![NuGet Version and Downloads count](https://buildstats.info/nuget/MiNET-CobwebSMP)](https://www.nuget.org/packages/MiNET-CobwebSMP/) 
+
+[![Chat](https://img.shields.io/badge/chat-on%20discord-7289da.svg)](https://discord.gg/xCNrhDd) 
+[![Build status](https://github.com/NiclasOlofsson/MiNET/actions/workflows/dotnetcore.yml/badge.svg)](https://github.com/NiclasOlofsson/MiNET/actions/workflows/dotnetcore.yml)
+[![NuGet Version and Downloads count](https://buildstats.info/nuget/MiNET)](https://www.nuget.org/packages/MiNET) 
 
 ## What is this?
 
-This is fork of [MiNET](https://github.com/NiclasOlofsson/MiNET), that includes additional changes and features:
+A basic Minecraft Pocket Edition (MCPE) server written in C#. Current goal is to create a server that has enterprise performance for large Minecraft multi-user gaming providers. Current servers handle 10-100 users per instance, the aim with MiNET is to deal with thousands. Priority is also to create interfaces, and to some extend, ready-made implementations of the most basic enterprise game-management features (users, worlds, etc.). With all likelyhood, MiNET will emerge into a Microsoft Cloud ready product.
 
- - Latest Minecraft Bedrock Edition support
- - 1.13 world format support
- - Basic redstone functions
- - Rebuilt resources and formats for easier updating
- - Emotes
- - And more
+As part of the project, I also deliver an up-to-date [automatically generated MCPE Protocol Specification](/src/MiNET/MiNET/Net/MCPE%20Protocol%20Documentation.md). This is a synery of that large parts of the communication code being generated using XML and T4 templates.
+
+## Why do this?
+
+This is actually a pet-project - a true father-son project that I do together with my son Oliver 6 years old. He is driving the requirements for this, doing much of prioritization of the order of implementation. He is a great fan of online-MCPE gaming, but still too young to play the "real deal". He also lacks the patience and understanding of laggy under-performant servers, and the consequences of that. He is also not a big fan of the kill-style game-modes around, so a sub-project of this is for him to create new kidz-friendly game-modes that we can implement in MiNET. Oliver was the one originally responsible for creating the scope of our project.
+
+And as he really likes to tell his mother these days "Mom, don't disturb daddy. He is working for me now!". 6 years old, but I think you get the picture. I know he does.
+
+Follow me on <a href="https://twitter.com/NiclasOlofsson" class="twitter-follow-button" data-show-count="true" data-size="large" data-dnt="true">Twitter @NiclasOlofsson</a> for news about the project, or simply track the checkins which i tend to comment heavily.
+ 
+MiNET is running CI through the fantastic service of AppVeyor. Currently the build status of master is...    
+[![Build status](https://ci.appveyor.com/api/projects/status/gb8ukrnogknic26e/branch/master)](https://ci.appveyor.com/project/NiclasOlofsson/MiNET/branch/master)
+
+## Can I do my own plugins?
+
+Yes you can! See the [Plugin documention in the wiki](https://github.com/NiclasOlofsson/MiNET/wiki/Plugin-API-Documentation)
+
+**Please note that the plugin system is always going to be work in progress and the example might be a bit outdated at times.**
+
+## Can I contribute?
+
+Of course you can! We just need you to accept the following:
+
+1. You will use the same coding style as the rest of the code.
+2. You do not copy code from anyone or anywhere, unless you have their permissions.
+3. We can always decide not to include your code, and we might make changes to it. So better ask before you do a pull request to the project.
+
+Also, make sure to join our discord chat for easy communication.    
+[![Chat](https://img.shields.io/badge/chat-on%20discord-7289da.svg)](https://discord.gg/xCNrhDd) 
+
+## Are there forums for MiNET?
+
+No, but you can ask questions on [stack**overflow**](http://stackoverflow.com/questions/ask?tags=minet) using the tag *MiNET*. 
 
 ## Getting started
-Download minet.zip from [Releases](https://github.com/CobwebSMP/MiNET/releases), extract MiNET folder, run MiNET.Console.exe.
-This action will also create Worlds, Plugins and ResourcePacks folders.
 
-**Worlds** - You can load world LevelDB files exported with Minecraft Bedrock Edition 1.13 or converted to 1.13 format with [Chunker.app](https://chunker.app/). World data (level.dat, .... ) have to extracted in Worlds folder.
-
-**Plugins** - There isn't many plugins for MiNET but here and there you may find some or you can made one. Useful links: [Plugin documention](https://github.com/NiclasOlofsson/MiNET/wiki/Plugin-API-Documentation), [MiNET TestPlugin](https://github.com/NiclasOlofsson/MiNET/tree/master/src/MiNET/TestPlugin)
-
-**ResourcePacks** - Resource packs made for the latest game version should work also here. If you got pack with .mcpack extension, just rename it to .zip and it's good to go.
-
-## Stability
-Since this software is used and maintained for our server purposes, this may not contain all features, updates and fixes.
-
-But if you found something you can always open an issue or pull request if you have solution.
-
-**Known problems** :
- - Saving isn't working properly, block entities may fail to save, blockstates may change values on save. Solution: Disable saving in server.conf.
-
-## Plugins
-Here are few plugins for MiNET that you can try:
-
- - [MiPermissionsNET](https://github.com/CupidonSauce173/MiPermissionsNET)
- - [WorldEdit](https://github.com/CobwebSMP/WorldEdit)
-
+See the [Getting Started](https://github.com/NiclasOlofsson/MiNET/wiki/Getting-Started) section on the wiki.

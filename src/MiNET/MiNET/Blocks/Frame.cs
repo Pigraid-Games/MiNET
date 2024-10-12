@@ -27,7 +27,6 @@ using System.Numerics;
 using log4net;
 using MiNET.BlockEntities;
 using MiNET.Items;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -35,7 +34,7 @@ namespace MiNET.Blocks
 {
 	public partial class Frame : Block
 	{
-		public Frame() : base(199)
+		public Frame() : base()
 		{
 			IsTransparent = true;
 			IsSolid = false;
@@ -48,7 +47,7 @@ namespace MiNET.Blocks
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			FacingDirection = (int) face;
+			FacingDirection = face;
 
 			var itemFrameBlockEntity = new ItemFrameBlockEntity {Coordinates = Coordinates};
 			world.SetBlockEntity(itemFrameBlockEntity);
@@ -64,13 +63,12 @@ namespace MiNET.Blocks
 
 			if (world.GetBlockEntity(blockCoordinates) is ItemFrameBlockEntity blockEntity)
 			{
-				int rotation = blockEntity.Rotation;
+				var rotation = blockEntity.GetLagacyRotation();
 
-				if (itemInHand.Equals(blockEntity.ItemInFrame) && itemInHand.Equals(new ItemAir())) return true;
+				if (itemInHand.Equals(blockEntity.Item) && itemInHand.Equals(new ItemAir())) return true;
 
-				if (itemInHand.Equals(blockEntity.ItemInFrame) || itemInHand.Equals(new ItemAir()))
+				if (itemInHand.Equals(blockEntity.Item) || itemInHand.Equals(new ItemAir()))
 				{
-					itemInHand = blockEntity.ItemInFrame;
 					rotation++;
 					if (rotation > 7)
 					{
@@ -80,9 +78,11 @@ namespace MiNET.Blocks
 				else
 				{
 					rotation = 0;
+					blockEntity.Item = itemInHand;
 				}
 
-				blockEntity.SetItem(itemInHand, rotation);
+				blockEntity.SetLagacyRotation(rotation);
+
 				world.SetBlockEntity(blockEntity);
 			}
 
@@ -93,8 +93,10 @@ namespace MiNET.Blocks
 		{
 			if (world.GetBlockEntity(Coordinates) is ItemFrameBlockEntity blockEntity)
 			{
-				Item item = blockEntity.ItemInFrame;
-				blockEntity.SetItem(null, 0);
+				Item item = blockEntity.Item;
+				blockEntity.Item = new ItemAir();
+				blockEntity.Rotation = 0;
+
 				world.SetBlockEntity(blockEntity);
 				if (item != null)
 				{

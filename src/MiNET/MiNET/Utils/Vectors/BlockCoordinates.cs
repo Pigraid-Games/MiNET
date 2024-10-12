@@ -24,7 +24,10 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.Numerics;
+using fNbt.Serialization;
+using Newtonsoft.Json;
 
 namespace MiNET.Utils.Vectors
 {
@@ -96,6 +99,7 @@ namespace MiNET.Utils.Vectors
 		/// <summary>
 		///     Finds the distance of this Coordinate3D from BlockCoordinates.Zero
 		/// </summary>
+		[JsonIgnore, NbtIgnore]
 		public double Distance
 		{
 			get { return DistanceTo(Zero); }
@@ -127,6 +131,42 @@ namespace MiNET.Utils.Vectors
 		public static bool operator ==(BlockCoordinates a, BlockCoordinates b)
 		{
 			return a.Equals(b);
+		}
+
+		public static BlockCoordinates operator +(BlockCoordinates a, Direction direction)
+		{
+			return direction switch
+			{
+				Direction.North => a.BlockNorth(),
+				Direction.South => a.BlockSouth(),
+				Direction.East => a.BlockEast(),
+				Direction.West => a.BlockWest(),
+				_ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
+			};
+		}
+
+		public static BlockCoordinates operator -(BlockCoordinates a, Direction direction)
+		{
+			return a + direction.Opposite();
+		}
+
+		public static BlockCoordinates operator +(BlockCoordinates a, BlockFace face)
+		{
+			return face switch
+			{
+				BlockFace.Down => a.BlockDown(),
+				BlockFace.Up => a.BlockUp(),
+				BlockFace.North => a.BlockNorth(),
+				BlockFace.South => a.BlockSouth(),
+				BlockFace.East => a.BlockEast(),
+				BlockFace.West => a.BlockWest(),
+				_ => throw new ArgumentOutOfRangeException(nameof(face), face, null)
+			};
+		}
+
+		public static BlockCoordinates operator -(BlockCoordinates a, BlockFace face)
+		{
+			return a + face.Opposite();
 		}
 
 		public static BlockCoordinates operator +(BlockCoordinates a, BlockCoordinates b)
@@ -245,6 +285,24 @@ namespace MiNET.Utils.Vectors
 		public static readonly BlockCoordinates Backwards = new BlockCoordinates(0, 0, -1);
 		public static readonly BlockCoordinates Forwards = new BlockCoordinates(0, 0, 1);
 
+		public IEnumerable<BlockCoordinates> Get2dAroundCoordinates()
+		{
+			yield return BlockEast();
+			yield return BlockWest();
+			yield return BlockNorth();
+			yield return BlockSouth();
+		}
+
+		public IEnumerable<BlockCoordinates> Get3dAroundCoordinates()
+		{
+			yield return BlockUp();
+			yield return BlockDown();
+			yield return BlockEast();
+			yield return BlockWest();
+			yield return BlockNorth();
+			yield return BlockSouth();
+		}
+
 		public BlockCoordinates BlockUp()
 		{
 			return this + Up;
@@ -293,6 +351,19 @@ namespace MiNET.Utils.Vectors
 		public BlockCoordinates BlockSouthWest()
 		{
 			return this + South + West;
+		}
+
+		public BlockCoordinates GetNext(BlockFace face)
+		{
+			return face switch
+			{
+				BlockFace.Down => BlockDown(),
+				BlockFace.Up => BlockUp(),
+				BlockFace.North => BlockNorth(),
+				BlockFace.South => BlockSouth(),
+				BlockFace.West => BlockWest(),
+				BlockFace.East => BlockEast(),
+			};
 		}
 
 		public bool Equals(BlockCoordinates other)

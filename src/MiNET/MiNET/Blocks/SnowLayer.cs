@@ -35,10 +35,7 @@ namespace MiNET.Blocks
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(SnowLayer));
 
-		//[StateBit] public bool CoveredBit { get; set; } = false;
-		//[StateRange(0, 7)] public int Height { get; set; } = 0;
-
-		public SnowLayer() : base(78)
+		public SnowLayer() : base()
 		{
 			IsTransparent = true;
 			BlastResistance = 0.5f;
@@ -48,7 +45,7 @@ namespace MiNET.Blocks
 
 		protected override bool CanPlace(Level world, Player player, BlockCoordinates blockCoordinates, BlockCoordinates targetCoordinates, BlockFace face)
 		{
-			Block down = world.GetBlock(Coordinates.BlockDown());
+			var down = world.GetBlock(Coordinates.BlockDown());
 			if (down is Air)
 			{
 				return false;
@@ -72,22 +69,19 @@ namespace MiNET.Blocks
 				}
 				else
 				{
-					if (BlockFactory.GetBlockById(80) is Snow snow)
-					{
-						snow.Coordinates = Coordinates;
-						world.SetBlock(snow);
-						return true;
-					}
+					var snow = new Snow();
+					snow.Coordinates = Coordinates;
+					world.SetBlock(snow);
+					return true;
 				}
 			}
 
 			return false;
 		}
 
-		public override Item[] GetDrops(Item tool)
+		public override Item[] GetDrops(Level world, Item tool)
 		{
-			// One per layer.
-			return new[] {ItemFactory.GetItem(332, 0, (Height + 1))};
+			return [new ItemSnowball() { Count = (byte) (Height + 1) }];
 		}
 	}
 }

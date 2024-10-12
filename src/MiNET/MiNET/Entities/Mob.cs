@@ -212,10 +212,10 @@ namespace MiNET.Entities
 			//if (Math.Abs(_lastSentDir - Direction) < 1.1) Direction = _lastSentDir;
 			//if (Math.Abs(_lastSentHeadYaw - KnownPosition.HeadYaw) < 1.1) KnownPosition.HeadYaw = (float) _lastSentHeadYaw;
 
-			if ((_lastSentPos - KnownPosition).Length() > 0.01 || KnownPosition.GetDirection() != _lastSentRotation)
+			if ((_lastSentPos - KnownPosition).Length() > 0.01 || KnownPosition.GetDirectionVector() != _lastSentRotation)
 			{
 				_lastSentPos = KnownPosition;
-				_lastSentRotation = KnownPosition.GetDirection();
+				_lastSentRotation = KnownPosition.GetDirectionVector();
 
 				if (!IsRidden)
 				{
@@ -427,7 +427,7 @@ namespace MiNET.Entities
 
 			var block = Level.GetBlock(waterPos);
 
-			if (block == null || (block.Id != 8 && block.Id != 9)) return false;
+			if (block == null || (block is not Water && block is not FlowingWater)) return false;
 
 			return y < Math.Floor(y) + 1 - ((1f / 9f) - 0.1111111);
 		}

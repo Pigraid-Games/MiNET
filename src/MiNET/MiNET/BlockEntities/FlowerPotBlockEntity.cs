@@ -23,8 +23,10 @@
 
 #endregion
 
-using fNbt;
+using System.Collections.Generic;
 using log4net;
+using MiNET.Blocks;
+using MiNET.Items;
 
 namespace MiNET.BlockEntities
 {
@@ -32,20 +34,20 @@ namespace MiNET.BlockEntities
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(FlowerPotBlockEntity));
 
-		private NbtCompound _compound;
+		public Block PlantBlock { get; set; }
 
-		public FlowerPotBlockEntity() : base("FlowerPot")
+		public FlowerPotBlockEntity() : base(BlockEntityIds.FlowerPot)
 		{
 		}
 
-		public override NbtCompound GetCompound()
+		public override List<Item> GetDrops()
 		{
-			return _compound ?? new NbtCompound();
-		}
+			if (PlantBlock == null)
+			{
+				return new List<Item>();
+			}
 
-		public override void SetCompound(NbtCompound compound)
-		{
-			_compound = compound;
+			return new List<Item> { ItemFactory.GetItem(PlantBlock) };
 		}
 	}
 }

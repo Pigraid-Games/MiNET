@@ -25,9 +25,9 @@
 
 namespace MiNET.Blocks
 {
-	public partial class StoneBrickStairs : BlockStairs
+	public partial class StoneBrickStairs : StairsBase
 	{
-		public StoneBrickStairs() : base(109)
+		public StoneBrickStairs() : base()
 		{
 			BlastResistance = 30;
 			Hardness = 2;

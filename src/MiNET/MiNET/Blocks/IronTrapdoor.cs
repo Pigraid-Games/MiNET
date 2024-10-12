@@ -23,17 +23,15 @@
 
 #endregion
 
-using System.Numerics;
-using MiNET.Utils;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-
 namespace MiNET.Blocks
 {
-	public partial class IronTrapdoor : TrapdoorBase
+	public partial class IronTrapdoor
 	{
-		public IronTrapdoor() : base(167)
+		public IronTrapdoor() : base()
 		{
+			IsTransparent = true;
+			BlastResistance = 25;
+			Hardness = 5;
 		}
 	}
 }

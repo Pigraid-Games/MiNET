@@ -25,36 +25,32 @@
 
 using System.Numerics;
 using MiNET.Blocks;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
 namespace MiNET.Items
 {
-	public class ItemSlate : ItemBlock
+	public abstract class ItemSlate : ItemBlock<Chalkboard>
 	{
-		public ItemSlate(short size = 0) : base("minecraft:board", 454, size)
+		public override string Id { get; protected set; } = "minecraft:board";
+
+		public ItemSlate(short size = 0) : base()
 		{
+			Block.Size = (byte) (Metadata = size);
 			MaxStackSize = 16;
 		}
 
-		public override void PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
 			// block 230, data 32-35 (rotations) Slate, Poster or Board
 
 			if (face == BlockFace.Down) // At the bottom of block
 			{
 				// Doesn't work, ignore if that happen. 
-				return;
-			}
-			else
-			{
-				Block = BlockFactory.GetBlockById(230);
+				return false;
 			}
 
-			Block.Metadata = (byte) Metadata;
-
-			base.PlaceBlock(world, player, blockCoordinates, face, faceCoords);
+			return base.PlaceBlock(world, player, blockCoordinates, face, faceCoords);
 		}
 	}
 

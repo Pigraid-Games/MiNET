@@ -25,10 +25,11 @@
 
 namespace MiNET.Items
 {
-	public class ItemAir : Item
+	public partial class ItemAir : Item
 	{
-		public ItemAir() : base("minecraft:air", 0, 0, 0)
+		public ItemAir() : base()
 		{
+			Count = 0;
 			UniqueId = 0;
 		}
 	}

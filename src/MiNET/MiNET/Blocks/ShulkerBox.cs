@@ -18,49 +18,17 @@
 // The Original Developer is the Initial Developer.  The Initial Developer of
 // the Original Code is Niclas Olofsson.
 // 
-// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2023 Niclas Olofsson. 
+// All portions of the code written by Niclas Olofsson are Copyright (c) 2014-2018 Niclas Olofsson. 
 // All Rights Reserved.
 
 #endregion
 
-using System.Numerics;
-using MiNET.BlockEntities;
-using MiNET.Items;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-
 namespace MiNET.Blocks
 {
-	public partial class ShulkerBox : Block
+	public partial class ShulkerBox : UndyedShulkerBox
 	{
-		public ShulkerBox() : base(218)
+		public ShulkerBox() : base()
 		{
-			IsTransparent = true;
-			BlastResistance = 30f;
-			Hardness = 6f;
-		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			Color = BlockFactory.getBlockColor(player.Inventory.GetItemInHand().Id, (byte) player.Inventory.GetItemInHand().Metadata);
-
-			var shulkerBoxBlockEntity = new ShulkerBoxBlockEntity
-			{
-				Coordinates = Coordinates,
-				Facing = (byte) face
-			};
-
-			world.SetBlockEntity(shulkerBoxBlockEntity);
-
-			return false;
-		}
-
-
-		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
-		{
-			player.OpenInventory(blockCoordinates);
-
-			return true;
 		}
 	}
 }

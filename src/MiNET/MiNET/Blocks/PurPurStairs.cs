@@ -25,9 +25,9 @@
 
 namespace MiNET.Blocks
 {
-	public partial class PurpurStairs : BlockStairs
+	public partial class PurpurStairs : StairsBase
 	{
-		public PurpurStairs() : base(203)
+		public PurpurStairs() : base()
 		{
 		}
 	}

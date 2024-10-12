@@ -47,11 +47,11 @@ namespace MiNET.Entities.Behaviors
 			if (_entity.Level.Random.Next(1000) != 0) return false;
 
 			var coordinates = _entity.KnownPosition;
-			var direction = Vector3.Normalize(coordinates.GetHeadDirection());
+			var direction = Vector3.Normalize(coordinates.GetHeadDirectionVector());
 
 			BlockCoordinates coord = new Vector3(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z);
 
-			var shouldStart = _entity.Level.GetBlock(coord.BlockDown()) is Grass || _entity.Level.GetBlock(coord) is Tallgrass;
+			var shouldStart = _entity.Level.GetBlock(coord.BlockDown()) is GrassBlock || _entity.Level.GetBlock(coord) is ShortGrass;
 			if (!shouldStart) return false;
 
 			_duration = 40;
@@ -74,23 +74,23 @@ namespace MiNET.Entities.Behaviors
 		public override void OnEnd()
 		{
 			var coordinates = _entity.KnownPosition;
-			var direction = Vector3.Normalize(coordinates.GetHeadDirection());
+			var direction = Vector3.Normalize(coordinates.GetHeadDirectionVector());
 
 			BlockCoordinates coord = new Vector3(coordinates.X + direction.X, coordinates.Y, coordinates.Z + direction.Z);
 
-			int runtimeId = 0;
-			if (_entity.Level.GetBlock(coord) is Tallgrass)
+			Block broken = null;
+			if (_entity.Level.GetBlock(coord) is ShortGrass)
 			{
-				runtimeId = _entity.Level.GetBlock(coord).GetRuntimeId();
+				broken = _entity.Level.GetBlock(coord);
 				_entity.Level.SetAir(coord);
 			}
 			else
 			{
 				coord += BlockCoordinates.Down;
-				runtimeId = _entity.Level.GetBlock(coord).GetRuntimeId();
+				broken = _entity.Level.GetBlock(coord);
 				_entity.Level.SetBlock(new Dirt {Coordinates = coord});
 			}
-			DestroyBlockParticle particle = new DestroyBlockParticle(_entity.Level, coord, (uint) runtimeId);
+			DestroyBlockParticle particle = new DestroyBlockParticle(_entity.Level, broken);
 			particle.Spawn();
 		}
 	}

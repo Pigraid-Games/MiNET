@@ -28,17 +28,16 @@ using System.Numerics;
 using System.Threading.Tasks;
 using log4net;
 using MiNET.Net;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
 namespace MiNET.Items
 {
-	public class ItemStick : Item
+	public partial class ItemStick
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(ItemStick));
 
-		public ItemStick() : base("minecraft:stick", 280)
+		public ItemStick() : base()
 		{
 			FuelEfficiency = 5;
 		}
@@ -54,7 +53,7 @@ namespace MiNET.Items
 					return;
 				}
 
-				Vector3 velocity = Vector3.Normalize(player.KnownPosition.GetHeadDirection()) * (float) currentSpeed;
+				Vector3 velocity = Vector3.Normalize(player.KnownPosition.GetHeadDirectionVector()) * (float) currentSpeed;
 				float factor = (float) (1 + 1 / (1 + currentSpeed * 2));
 				velocity *= factor;
 

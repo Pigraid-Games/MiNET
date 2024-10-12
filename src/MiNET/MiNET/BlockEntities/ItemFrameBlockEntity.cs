@@ -1,4 +1,4 @@
-#region LICENSE
+﻿#region LICENSE
 
 // The contents of this file are subject to the Common Public Attribution
 // License Version 1.0. (the "License"); you may not use this file except in
@@ -23,119 +23,54 @@
 
 #endregion
 
+using System;
 using System.Collections.Generic;
-using fNbt;
+using fNbt.Serialization;
 using MiNET.Items;
 
 namespace MiNET.BlockEntities
 {
 	public class ItemFrameBlockEntity : BlockEntity
 	{
-		private NbtCompound Compound { get; set; }
-		public Item ItemInFrame { get; private set; }
-		public int Rotation { get; private set; }
-		public float DropChance { get; private set; }
+		public Item Item { get; set; }
 
-		public ItemFrameBlockEntity() : base("ItemFrame")
+		[NbtProperty("ItemRotation")]
+		public float Rotation { get; set; }
+
+		[NbtProperty("ItemDropChance")]
+		public float DropChance { get; set; } = 1f;
+
+		public ItemFrameBlockEntity() : base(BlockEntityIds.ItemFrame)
 		{
-			Compound = new NbtCompound(string.Empty)
-			{
-				new NbtCompound("Item", new NbtCompound("Item")),
-				new NbtString("id", Id),
-				new NbtInt("x", Coordinates.X),
-				new NbtInt("y", Coordinates.Y),
-				new NbtInt("z", Coordinates.Z),
-			};
-
-			var item = (NbtCompound) Compound["Item"];
-			item.Add(new NbtShort("id", 0));
-			item.Add(new NbtShort("Damage", 0));
-			item.Add(new NbtByte("Count", 0));
-
-			//Log.Error($"New ItemFrame block entity: {Compound}");
+			Item = new ItemAir();
 		}
 
-		public override NbtCompound GetCompound()
+		/// <summary>
+		/// Set the rotation value from 0 to 7
+		/// </summary>
+		/// <param name="rotation"></param>
+		public void SetLagacyRotation(int rotation)
 		{
-			Compound["x"] = new NbtInt("x", Coordinates.X);
-			Compound["y"] = new NbtInt("y", Coordinates.Y);
-			Compound["z"] = new NbtInt("z", Coordinates.Z);
+			if (rotation < 0 || rotation > 7)
+			{
+				rotation = 0;
+			}
 
-			return Compound;
+			Rotation = rotation * 45;
 		}
 
-		public override void SetCompound(NbtCompound compound)
+		/// <summary>
+		/// Get the rotation value from 0 to 7
+		/// </summary>
+		/// <param name="rotation"></param>
+		public int GetLagacyRotation()
 		{
-			Compound = compound;
-			if (compound.TryGet("Item", out var item))
-			{
-				var id = item["id"].ShortValue;
-				var damage = item["Damage"].ShortValue;
-				var count = item["Count"].ShortValue;
-				ItemInFrame = ItemFactory.GetItem(id, damage, count);
-			}
-			if (compound.TryGet("ItemRotation", out var rotation))
-			{
-				Rotation = rotation.ByteValue;
-			}
-			if (compound.TryGet("ItemDropChance", out var dropChance))
-			{
-				DropChance = dropChance.FloatValue;
-			}
-		}
-
-		public void SetItem(Item item, int rotation)
-		{
-			ItemInFrame = item;
-			Rotation = rotation;
-
-			var comp = new NbtCompound(string.Empty)
-			{
-				new NbtString("id", Id),
-				new NbtInt("x", Coordinates.X),
-				new NbtInt("y", Coordinates.Y),
-				new NbtInt("z", Coordinates.Z),
-				new NbtFloat("ItemDropChance", DropChance),
-				new NbtByte("ItemRotation", (byte) Rotation),
-			};
-
-			if (item != null)
-			{
-				var newItem = new NbtCompound("Item")
-				{
-					new NbtShort("id", item.Id),
-					new NbtShort("Damage", item.Metadata),
-					new NbtByte("Count", 1)
-				};
-
-				if (item.ExtraData != null)
-				{
-					var newTag = (NbtTag) item.ExtraData.Clone();
-					newTag.Name = "tag";
-					newItem.Add(newTag);
-				}
-
-				comp["Item"] = newItem;
-			}
-			else
-			{
-				comp.Remove("Item");
-			}
-
-			Compound = comp;
+			return (int)Math.Clamp(Math.Floor(Rotation / 45), 0, 7);
 		}
 
 		public override List<Item> GetDrops()
 		{
-			List<Item> slots = new List<Item>();
-
-			var itemComp = Compound["Item"] as NbtCompound;
-			if (itemComp == null) return slots;
-
-			Item item = ItemFactory.GetItem(itemComp["id"].ShortValue, itemComp["Damage"].ShortValue, itemComp["Count"].ByteValue);
-			slots.Add(item);
-
-			return slots;
+			return new List<Item> { Item };
 		}
 	}
 }

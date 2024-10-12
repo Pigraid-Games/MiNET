@@ -27,39 +27,38 @@ using System;
 using System.Numerics;
 using MiNET.BlockEntities;
 using MiNET.Blocks;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
 namespace MiNET.Items
 {
-	public class ItemSkull : Item
+	public partial class ItemSkull
 	{
-		public ItemSkull(short metadata) : base("minecraft:skull", 397, metadata)
+		public ItemSkull() : base()
 		{
-			MaxStackSize = 1;
+
 		}
 
-		public override void PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
 			var coor = GetNewCoordinatesFromFace(blockCoordinates, face);
 			if (face == BlockFace.Up) // On top of block
 			{
-				var skull = (Skull) BlockFactory.GetBlockById(144);
+				var skull = new Skull();
 				skull.Coordinates = coor;
-				skull.FacingDirection = 1; // Skull on floor, rotation in block entity
+				skull.FacingDirection = BlockFace.Up; // Skull on floor, rotation in block entity
 				world.SetBlock(skull);
 			}
 			else if (face == BlockFace.Down) // At the bottom of block
 			{
 				// Doesn't work, ignore if that happen. 
-				return;
+				return false;
 			}
 			else
 			{
-				var skull = (Skull) BlockFactory.GetBlockById(144);
+				var skull = new Skull();
 				skull.Coordinates = coor;
-				skull.FacingDirection = (int) face; // Skull on floor, rotation in block entity
+				skull.FacingDirection = face; // Skull on floor, rotation in block entity
 				world.SetBlock(skull);
 			}
 
@@ -68,7 +67,7 @@ namespace MiNET.Items
 			var skullBlockEntity = new SkullBlockEntity
 			{
 				Coordinates = coor,
-				Rotation = (byte) ((int) (Math.Floor(((player.KnownPosition.Yaw)) * 16 / 360) + 0.5) & 0x0f),
+				Rotation = (byte) player.KnownPosition.GetDirection16(),
 				SkullType = (byte) Metadata
 			};
 
@@ -81,6 +80,8 @@ namespace MiNET.Items
 				itemInHand.Count--;
 				player.Inventory.SetInventorySlot(player.Inventory.InHandSlot, itemInHand);
 			}
+
+			return true;
 		}
 	}
 }

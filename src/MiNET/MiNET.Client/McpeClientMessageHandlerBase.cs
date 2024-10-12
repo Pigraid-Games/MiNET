@@ -114,11 +114,11 @@ namespace MiNET.Client
 			//response.responseStatus = 3;
 			//SendPackage(response);
 
-			if (message.behahaviorpackinfos.Count != 0)
+			if (message.resourcePacks.Count != 0)
 			{
 				var resourcePackIds = new ResourcePackIds();
 
-				foreach (ResourcePackInfo packInfo in message.behahaviorpackinfos)
+				foreach (var packInfo in message.resourcePacks)
 				{
 					resourcePackIds.Add(packInfo.UUID);
 				}
@@ -172,8 +172,8 @@ namespace MiNET.Client
 			BlockPalette blockPalette = message.blockPalette;
 			client.BlockPalette = blockPalette;
 			client.LevelInfo.LevelName = message.worldName;
-			client.LevelInfo.Version = 19133;
-			client.LevelInfo.GameType = message.levelSettings.gamemode;
+			client.LevelInfo.NbtVersion = 19133;
+			client.LevelInfo.GameType = message.levelSettings.GameMode;
 
 			var packet = McpeRequestChunkRadius.CreateObject();
 			client.ChunkRadius = 5;
@@ -256,7 +256,6 @@ namespace MiNET.Client
 
 		public virtual void HandleMcpeMobEffect(McpeMobEffect message)
 		{
-			Log.Warn($"I got effect: {message.runtimeEntityId} / {message.eventId} / {message.effectId} / {message.amplifier} / {message.particles} / {message.duration} / {message.tick}");
 		}
 
 		public virtual void HandleMcpeUpdateAttributes(McpeUpdateAttributes message)
@@ -269,7 +268,6 @@ namespace MiNET.Client
 
 		public virtual void HandleMcpeMobEquipment(McpeMobEquipment message)
 		{
-			/*Log.Warn($"Entity with {message.runtimeEntityId} is holding {message.item.Name}");*/
 		}
 
 		public virtual void HandleMcpeMobArmorEquipment(McpeMobArmorEquipment message)
@@ -286,25 +284,6 @@ namespace MiNET.Client
 
 		public virtual void HandleMcpeSetEntityData(McpeSetEntityData message)
 		{
-			/*if (message.metadata[0] == null) { return; }
-			MetadataLong metadataLong = message.metadata[0] as MetadataLong;
-			byte[] bytes = BitConverter.GetBytes(metadataLong.Value);
-			BitArray bits = new BitArray(bytes);
-			Log.Warn($"Got entity metadata flags from value: {metadataLong.Value}");
-			Log.Warn($"start =============================================");
-			for (int i = 0; i < Enum.GetValues(typeof(DataFlags)).Length; i++)
-			{
-				DataFlags flag = (DataFlags) i;
-				if (i < 64)
-				{
-					Log.Warn($"{flag}: {bits[i]}");
-				}
-				else
-				{
-					Log.Warn($"{flag}: {bits[i - 64]}");
-				}
-			}
-			Log.Warn($"end =============================================");*/
 		}
 
 		public virtual void HandleMcpeSetEntityMotion(McpeSetEntityMotion message)
@@ -321,10 +300,8 @@ namespace MiNET.Client
 
 		public virtual void HandleMcpeSetSpawnPosition(McpeSetSpawnPosition message)
 		{
-			Client.SpawnPoint = new Vector3(message.coordinates.X, message.coordinates.Y, message.coordinates.Z);
-			Client.LevelInfo.SpawnX = (int) Client.SpawnPoint.X;
-			Client.LevelInfo.SpawnY = (int) Client.SpawnPoint.Y;
-			Client.LevelInfo.SpawnZ = (int) Client.SpawnPoint.Z;
+			Client.SpawnPoint = (Vector3) message.coordinates;
+			Client.LevelInfo.Spawn = message.coordinates;
 		}
 
 		public virtual void HandleMcpeAnimate(McpeAnimate message)
@@ -361,10 +338,6 @@ namespace MiNET.Client
 		}
 
 		public virtual void HandleMcpeCraftingData(McpeCraftingData message)
-		{
-		}
-
-		public virtual void HandleMcpeCraftingEvent(McpeCraftingEvent message)
 		{
 		}
 
@@ -708,13 +681,7 @@ namespace MiNET.Client
 		}
 
 		/// <inheritdoc />
-		public virtual void HandleMcpeFilterTextPacket(McpeFilterTextPacket message)
-		{
-			
-		}
-
-		/// <inheritdoc />
-		public virtual void HandleMcpeUpdateSubChunkBlocksPacket(McpeUpdateSubChunkBlocksPacket message)
+		public void HandleMcpeUpdateSubChunkBlocksPacket(McpeUpdateSubChunkBlocksPacket message)
 		{
 			
 		}
@@ -734,7 +701,7 @@ namespace MiNET.Client
 		/// <inheritdoc />
 		public void HandleMcpeUpdateAbilities(McpeUpdateAbilities message)
 		{
-			Client.permissionLevel = (PermissionLevel) message.playerPermissions;
+			
 		}
 
 		/// <inheritdoc />
@@ -761,22 +728,58 @@ namespace MiNET.Client
 			
 		}
 
-		public void HandleMcpeEmote(McpeEmotePacket message)
+		public void HandleMcpeSetPlayerInventoryOptions(McpeSetPlayerInventoryOptions message)
+		{
+		}
+
+		public void HandleMcpePlayerToggleCrafterSlotRequest(McpePlayerToggleCrafterSlotRequest message)
+		{
+		}
+
+		public void HandleMcpeServerPlayerPostMovePosition(McpeServerPlayerPostMovePosition message)
+		{
+		}
+
+		public void HandleMcpeSetHud(McpeSetHud message)
+		{
+		}
+
+		public void HandleMcpeAwardAchievement(McpeAwardAchievement message)
 		{
 
 		}
 
-		public void HandleMcpeEmoteList(McpeEmoteList message)
+		public void HandleMcpeCloseForm(McpeCloseForm message)
 		{
 
 		}
 
-		public void HandleMcpePermissionRequest(McpePermissionRequest message)
+		public void HandleMcpeCameraInstruction(McpeCameraInstruction message)
 		{
-
+			
 		}
 
-		public void HandleMcpePlayerFog(McpePlayerFog message)
+		public void HandleMcpeServerboundLoadingScreen(McpeServerboundLoadingScreen message)
+		{
+			
+		}
+
+		public void HandleMcpeJigsawStructureData(McpeJigsawStructureData message)
+		{
+			
+		}
+
+		public void HandleMcpeCurrentStructureFeature(McpeCurrentStructureFeature message)
+		{
+			
+		}
+
+		public void HandleMcpeServerboundDiagnostics(McpeServerboundDiagnostics message)
+		{
+			
+		}
+
+		public void HandleMcpeCameraAimAssist(McpeCameraAimAssist message)
 		{
 
 		}

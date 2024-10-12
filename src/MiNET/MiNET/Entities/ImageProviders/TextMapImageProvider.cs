@@ -23,6 +23,7 @@
 
 #endregion
 
+using System.Drawing.Drawing2D;
 using MiNET.Net;
 using MiNET.Utils;
 using SixLabors.Fonts;
@@ -30,6 +31,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using Color = System.Drawing.Color;
 using RectangleF = System.Drawing.RectangleF;
 
 namespace MiNET.Entities.ImageProviders
@@ -38,7 +40,7 @@ namespace MiNET.Entities.ImageProviders
 	{
 		private static FontCollection _fontCollection;
 		private static Font _font = null;
-
+		
 		static TextMapImageProvider()
 		{
 			_fontCollection = new FontCollection();
@@ -49,7 +51,7 @@ namespace MiNET.Entities.ImageProviders
 				_font = family.CreateFont(9);
 			}
 		}
-
+		
 		public string Text { get; set; }
 
 		public TextMapImageProvider(string text = "")
@@ -91,7 +93,13 @@ namespace MiNET.Entities.ImageProviders
 		{
 			var bitmap = new Image<Rgba32>(map.Col, map.Row);
 			var rectf = new RectangleF(0, 0, map.Col, map.Row);
-
+			/*var g = Graphics.FromImage(bitmap);
+			g.SmoothingMode = SmoothingMode.AntiAlias;
+			g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+			g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+			g.DrawString(text, new Font("SketchFlow Print", 10), Brushes.AntiqueWhite, rectf);
+			g.Flush();*/
+			
 			bitmap.Mutate(
 				x =>
 				{

@@ -25,11 +25,9 @@
 
 using System;
 using System.Numerics;
-using JetBrains.Annotations;
+using fNbt.Serialization;
 using log4net;
 using MiNET.Blocks;
-using MiNET.Entities;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 using Newtonsoft.Json;
@@ -39,112 +37,119 @@ namespace MiNET.Items
 	/// <summary>
 	///     Generic Item that will simply place the block on use. No interaction or other use supported by the block.
 	/// </summary>
+	public abstract class ItemBlock<TBlock> : ItemBlock where TBlock : Block, new()
+	{
+		[JsonIgnore]
+		public new TBlock Block { get => (TBlock) base.Block; }
+
+		public ItemBlock() : this(new TBlock())
+		{
+
+		}
+
+		protected ItemBlock(TBlock block) : base(block)
+		{
+
+		}
+	}
+
+	/// <summary>
+	///     Generic Item that will simply place the block on use. No interaction or other use supported by the block.
+	/// </summary>
 	public class ItemBlock : Item
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(ItemBlock));
 
-		[JsonIgnore] public Block Block { get; protected set; }
+		[JsonIgnore]
+		[NbtProperty]
+		public virtual Block Block { get; protected set; }
 
-		protected ItemBlock(string name, short id, short metadata = 0) : base(name, id, metadata)
+		public override int BlockRuntimeId => Block?.RuntimeId ?? -1;
+
+		public override bool Edu { get => base.Edu || (Block?.Edu ?? false); protected set => base.Edu = value; }
+
+		protected ItemBlock()
 		{
-			//TODO: Problematic block
-			Block = BlockFactory.GetBlockById(id);
 		}
 
-		public ItemBlock([NotNull] Block block, short metadata = 0) : base(block.Name, (short) (block.Id > 255 ? 255 - block.Id : block.Id), metadata)
+		internal ItemBlock(Block block)
 		{
 			Block = block ?? throw new ArgumentNullException(nameof(block));
+
+			Id ??= block.Id;
 	
-			if (BlockFactory.BlockStates.TryGetValue(block.GetState(), out BlockStateContainer value))
-			{
-				Metadata = (short) (value.ItemInstance?.Metadata ?? (value.Data == -1 ? 0 : value.Data));
-			}
-
 			FuelEfficiency = Block.FuelEfficiency;
+			Edu = Block.Edu;
 		}
 
-		public override Item GetSmelt()
+		public override Item GetSmelt(string block)
 		{
-			return Block.GetSmelt();
+			return Block.GetSmelt(block) ?? base.GetSmelt(block);
 		}
 
-		public static int GetFacingDirectionFromEntity(Entity entity)
-		{
-			return entity.GetDirectionEmum() switch
-			{
-				Entity.Direction.South => 4,
-				Entity.Direction.West => 2,
-				Entity.Direction.North => 5,
-				Entity.Direction.East => 3,
-				_ => throw new ArgumentOutOfRangeException()
-			};
-		}
-
-		public static int GetReverseFacingDirectionFromEntity(Entity entity)
-		{
-			return entity.GetDirectionEmum() switch
-			{
-				Entity.Direction.South => 5,
-				Entity.Direction.West => 3,
-				Entity.Direction.North => 4,
-				Entity.Direction.East => 2,
-				_ => throw new ArgumentOutOfRangeException()
-			};
-		}
-
-		public static BlockAxis GetPillarAxisFromFace(BlockFace face)
-		{
-			return face switch
-			{
-				BlockFace.Down => BlockAxis.Y,
-				BlockFace.Up => BlockAxis.Y,
-				BlockFace.North => BlockAxis.Z,
-				BlockFace.South => BlockAxis.Z,
-				BlockFace.West => BlockAxis.X,
-				BlockFace.East => BlockAxis.X,
-				_ => throw new ArgumentOutOfRangeException(nameof(face), face, null)
-			};
-		}
-
-		public override void PlaceBlock(Level world, Player player, BlockCoordinates targetCoordinates, BlockFace face, Vector3 faceCoords)
+		public override bool PlaceBlock(Level world, Player player, BlockCoordinates targetCoordinates, BlockFace face, Vector3 faceCoords)
 		{
 			Block currentBlock = world.GetBlock(targetCoordinates);
 			Block newBlock = BlockFactory.GetBlockById(Block.Id);
 			newBlock.Coordinates = currentBlock.IsReplaceable ? targetCoordinates : GetNewCoordinatesFromFace(targetCoordinates, face);
 
-			// This won't work without explicit mapping where an item dictates
-			// the initial value of a block. Need some sort of manual mapping or from
-			// generated data. The logic belong to the item.
-			// Basically what we want to do here is to check all items for a blockstate
-			// and find a matching one. Then use the blockstate for that item, to set the
-			// default data for this item.
-			newBlock.SetState(Block.GetState());
-
-			//newBlock.Metadata = (byte) Metadata;
+			newBlock.SetStates(Block);
 
 			if (!newBlock.CanPlace(world, player, targetCoordinates, face))
 			{
-				return;
+				return false;
 			}
 
-			if (!newBlock.PlaceBlock(world, player, targetCoordinates, face, faceCoords))
+			// TODO - invert logic
+			if (newBlock.PlaceBlock(world, player, targetCoordinates, face, faceCoords))
 			{
-				world.SetBlock(newBlock);
+				return false;
 			}
 
-			if (player.GameMode == GameMode.Survival && newBlock.Id != 0)
+			world.SetBlock(newBlock);
+
+			if (player.GameMode == GameMode.Survival && newBlock is not Air)
 			{
 				var itemInHand = player.Inventory.GetItemInHand();
 				itemInHand.Count--;
 				player.Inventory.SetInventorySlot(player.Inventory.InHandSlot, itemInHand);
 			}
 
-			world.BroadcastSound(newBlock.Coordinates, LevelSoundEventType.Place, newBlock.GetRuntimeId());
+			// TODO - should move to the Block
+			world.BroadcastSound(newBlock.Coordinates, LevelSoundEventType.Place, newBlock.RuntimeId);
+
+			return true;
+		}
+
+		public override object Clone()
+		{
+			var item = (ItemBlock) base.Clone();
+
+			item.Block = Block?.Clone() as Block;
+
+			return item;
 		}
 
 		public override string ToString()
 		{
 			return $"{GetType().Name}(Id={Id}, Meta={Metadata}, UniqueId={UniqueId}) {{Block={Block?.GetType().Name}}} Count={Count}, NBT={ExtraData}";
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(base.GetHashCode(), Block.GetHashCode());
+		}
+
+		internal void SetBlock(Block block)
+		{
+			Block = block;
+		}
+
+		protected override bool Equals(Item other)
+		{
+			return other is ItemBlock otherItemBlock
+				&& base.Equals(other)
+				&& Block.Equals(otherItemBlock.Block);
 		}
 	}
 }

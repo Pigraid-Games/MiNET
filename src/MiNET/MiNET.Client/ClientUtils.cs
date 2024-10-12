@@ -27,12 +27,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using fNbt;
+using fNbt.Serialization;
 using log4net;
+using MiNET.BlockEntities;
 using MiNET.Blocks;
 using MiNET.Net;
 using MiNET.Utils;
-using MiNET.Utils.Vectors;
 using MiNET.Worlds;
+using MiNET.Worlds.Anvil;
+using MiNET.Worlds.Anvil.Data;
 
 namespace MiNET.Client
 {
@@ -40,11 +43,12 @@ namespace MiNET.Client
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(ClientUtils));
 
+		private static int _waterOffsetY = 0;
 		private static string _basePath = @"D:\Temp\MCPEWorldStore";
 
-		//private static object _chunkRead = new object();
+		private static object _chunkRead = new object();
 
-		public static ChunkColumn DecodeChunkColumn(int subChunkCount, byte[] buffer, BlockPalette bedrockPalette = null, HashSet<BlockStateContainer> internalBlockPallet = null)
+		public static ChunkColumn DecodeChunkColumn(int subChunkCount, byte[] buffer, BlockPalette bedrockPalette = null, HashSet<IBlockStateContainer> internalBlockPallet = null)
 		{
 			//lock (_chunkRead)
 			{
@@ -54,13 +58,13 @@ namespace MiNET.Client
 
 					if (subChunkCount < 1)
 					{
-						//Log.Warn("Nothing to read");
+						Log.Warn("Nothing to read");
 						return null;
 					}
 
 					//if (Log.IsTraceEnabled()) Log.Trace($"Reading {subChunkCount} sections");
 
-					var chunkColumn = new ChunkColumn(false);
+					var chunkColumn = new ChunkColumn();
 
 					for (int chunkIndex = 0; chunkIndex < subChunkCount; chunkIndex++)
 					{
@@ -82,8 +86,8 @@ namespace MiNET.Client
 							int blocksPerWord = (int) Math.Floor(32f / bitsPerBlock);
 							int wordsPerChunk = (int) Math.Ceiling(4096f / blocksPerWord);
 							uint wordsPer = (uint) Math.Ceiling(4096f / blocksPerWord);
-
-							Log.Debug($"New section {chunkIndex}, " +
+							if (Log.IsTraceEnabled())
+								Log.Trace($"New section {chunkIndex}, " +
 										$"version={version}, " +
 										$"storageSize={storageSize}, " +
 										$"storageIndex={storageIndex}, " +
@@ -103,7 +107,6 @@ namespace MiNET.Client
 									return null;
 
 								words[i] = (uint) ((byte) stream.ReadByte()) | (uint) ((byte) stream.ReadByte()) << 8 | (uint) ((byte) stream.ReadByte()) << 16 | (uint) ((byte) stream.ReadByte()) << 24;
-								Log.Debug($"bitsPerBlock {words[i]}");
 							}
 
 							var paletteCount = 1;
@@ -126,19 +129,19 @@ namespace MiNET.Client
 									file.LoadFromStream(stream, NbtCompression.None);
 									var tag = (NbtCompound) file.RootTag;
 
-									Block block = BlockFactory.GetBlockByName(tag["name"].StringValue);
+									Block block = BlockFactory.GetBlockById(tag["name"].StringValue);
 									if (block != null && block.GetType() != typeof(Block) && !(block is Air))
 									{
 										List<IBlockState> blockState = ReadBlockState(tag);
 										Log.Error(blockState.ToArray());
-										block.SetState(blockState);
+										block.SetStates(blockState);
 									}
 									else
 									{
 										block = new Air();
 									}
 
-									palette[j] = block.GetRuntimeId();
+									palette[j] = block.RuntimeId;
 								}
 								else
 								{
@@ -169,25 +172,15 @@ namespace MiNET.Client
 
 									int runtimeId = palette[state];
 
-									if (storageIndex == 0)
-									{
-										subChunk.SetBlockByRuntimeId(x, y, z, (int) runtimeId);
-									}
-									else
-									{
-										subChunk.SetLoggedBlockByRuntimeId(x, y, z, (int) runtimeId);
-									}
+									subChunk.SetBlockByRuntimeId(x, y, z, (int) runtimeId, storageIndex);
 
 									position++;
 								}
 							}
 							stream.Position = afterPos;
 						}
-					}
-
-					if (stream.Read(chunkColumn.biomeId, 0, 256) != 256)
 						return chunkColumn;
-					//Log.Debug($"biomeId:\n{Package.HexDump(chunk.biomeId)}");
+					}
 
 					if (stream.Position >= stream.Length - 1)
 						return chunkColumn;
@@ -195,12 +188,12 @@ namespace MiNET.Client
 					int borderBlock = (byte)VarInt.ReadSInt32(stream);
 					if (borderBlock != 0)
 					{
-						//Log.Warn($"??? Got borderblock with value {borderBlock}.");
+						Log.Warn($"??? Got borderblock with value {borderBlock}.");
 
 						int len = (int) (stream.Length - stream.Position);
 						var bytes = new byte[len];
 						stream.Read(bytes, 0, len);
-						//Log.Warn($"Data to read for border blocks\n{Packet.HexDump(new ReadOnlyMemory<byte>(bytes))}");
+						Log.Warn($"Data to read for border blocks\n{Packet.HexDump(new ReadOnlyMemory<byte>(bytes))}");
 
 						//byte[] buf = new byte[borderBlock];
 						//int len = stream.Read(buf, 0, borderBlock);
@@ -220,22 +213,18 @@ namespace MiNET.Client
 						{
 							NbtFile file = new NbtFile()
 							{
-								BigEndian = false,
-								UseVarInt = true
+								Flavor = NbtFlavor.Bedrock
 							};
 
 							file.LoadFromStream(stream, NbtCompression.None);
 							var blockEntityTag = file.RootTag;
 							if (blockEntityTag.Name != "alex")
 							{
-								int x = blockEntityTag["x"].IntValue;
-								int y = blockEntityTag["y"].IntValue;
-								int z = blockEntityTag["z"].IntValue;
+								// TODO - read directly from stream via NbtSerializer
+								var blockEntity = NbtConvert.FromNbt<BlockEntity>(file.RootTag);
+								chunkColumn.BlockEntities[blockEntity.Coordinates] = blockEntity;
 
-								chunkColumn.SetBlockEntity(new BlockCoordinates(x, y, z), (NbtCompound) file.RootTag);
-
-								if (Log.IsTraceEnabled())
-									Log.Trace($"Blockentity:\n{file.RootTag}");
+								if (Log.IsTraceEnabled()) Log.Trace($"Blockentity:\n{file.RootTag}");
 							}
 						}
 					}
@@ -468,13 +457,13 @@ namespace MiNET.Client
 			return states;
 		}
 
-		private static int GetServerRuntimeId(BlockPalette bedrockPalette, HashSet<BlockStateContainer> internalBlockPallet, int runtimeId)
+		private static int GetServerRuntimeId(BlockPalette bedrockPalette, HashSet<IBlockStateContainer> internalBlockPallet, int runtimeId)
 		{
 			if (runtimeId < 0 || runtimeId >= bedrockPalette.Count) Log.Error($"RuntimeId = {runtimeId}");
 
 			var record = bedrockPalette[runtimeId];
 
-			if (!internalBlockPallet.TryGetValue(record, out BlockStateContainer internalRecord))
+			if (!internalBlockPallet.TryGetValue(record, out var internalRecord))
 			{
 				Log.Error($"Did not find {record.Id}");
 				return 0; // air
@@ -500,9 +489,7 @@ namespace MiNET.Client
 			if (!Directory.Exists(_basePath))
 				Directory.CreateDirectory(_basePath);
 
-			NbtFile file = new NbtFile();
-			NbtTag dataTag = file.RootTag["Data"] = new NbtCompound("Data");
-			level.SaveToNbt(dataTag);
+			var file = NbtConvert.ToNbtFile(new LevelInfoRoot() { Data = level });
 			file.SaveToFile(Path.Combine(_basePath, "level.dat"), NbtCompression.GZip);
 		}
 

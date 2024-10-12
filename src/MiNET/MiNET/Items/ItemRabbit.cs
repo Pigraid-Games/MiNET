@@ -1,14 +1,10 @@
 ﻿namespace MiNET.Items
 {
-	public class ItemRabbit : FoodItem
+	public partial class ItemRabbit
 	{
-		public ItemRabbit() : base("minecraft:rabbit", 411, 0, 1, 0.6)
+		public ItemRabbit() : base(3, 1.8)
 		{
-		}
 
-		public override Item GetSmelt()
-		{
-			return new ItemCookedRabbit();
 		}
 	}
 }

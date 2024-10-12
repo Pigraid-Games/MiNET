@@ -55,6 +55,7 @@ namespace MiNET.Effects
 		HealthBoost = 21,
 		Absorption = 22,
 		Saturation = 23,
+		TurtleMaster = 24,
 	}
 
 	public class Effect

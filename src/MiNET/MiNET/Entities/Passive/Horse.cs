@@ -24,11 +24,15 @@
 #endregion
 
 using System;
+using System.Collections;
 using System.Numerics;
 using fNbt;
 using log4net;
+using MiNET.Blocks;
 using MiNET.Entities.Behaviors;
+using MiNET.Inventory;
 using MiNET.Items;
+using MiNET.Items.Extensions;
 using MiNET.Net;
 using MiNET.Utils;
 using MiNET.Utils.Metadata;
@@ -75,20 +79,27 @@ namespace MiNET.Entities.Passive
 
 		public override MetadataDictionary GetMetadata()
 		{
-			EatingHaystack = IsEating ? 32 : 0;
 			Scale = IsBaby ? 0.5582917f : 1.0;
 			var metadata = base.GetMetadata();
 			metadata[(int) MetadataFlags.Variant] = new MetadataInt(Variant);
-			metadata[(int) MetadataFlags.Markings] = new MetadataInt(Markings);
-			metadata[(int) MetadataFlags.EatingHaystack] = new MetadataInt(EatingHaystack);
+			metadata[(int) MetadataFlags.MarkVariant] = new MetadataInt(Markings);
 			if (IsTamed)
 			{
-				metadata[45] = new MetadataByte(12);
-				metadata[46] = new MetadataInt(2);
+				metadata[(int) MetadataFlags.ContainerSize] = new MetadataByte(12);
+				metadata[(int) MetadataFlags.ContainerStrengthModifier] = new MetadataInt(2);
 			}
 
 			Log.Debug($"Horse: {metadata}");
 			return metadata;
+		}
+
+		protected override BitArray GetFlags()
+		{
+			var bitArray = base.GetFlags();
+
+			bitArray[(int) DataFlags.Eating] = IsEating;
+
+			return bitArray;
 		}
 
 		public override EntityAttributes GetEntityAttributes()
@@ -114,7 +125,12 @@ namespace MiNET.Entities.Passive
 			}
 
 			var inHand = player.Inventory.GetItemInHand();
-			if (inHand is ItemSugar || inHand is ItemWheat || inHand is ItemApple || inHand is ItemGoldenCarrot || inHand is ItemGoldenApple || inHand.Id == 170)
+			if (inHand is ItemSugar 
+				|| inHand is ItemWheat 
+				|| inHand is ItemApple 
+				|| inHand is ItemGoldenCarrot 
+				|| inHand is ItemGoldenApple 
+				|| inHand.IsItemBlockOf<HayBlock>())
 			{
 				// Feeding
 
@@ -144,7 +160,7 @@ namespace MiNET.Entities.Passive
 					Temper += 10;
 					HealthManager.Regen(10);
 				}
-				else if (inHand.Id == 170)
+				else if (inHand.IsItemBlockOf<HayBlock>())
 				{
 					//Temper += 3;
 					HealthManager.Regen(20);
@@ -353,13 +369,10 @@ namespace MiNET.Entities.Passive
 
 			player.SendPacket(equ);
 
-			McpeInventoryContent containerSetContent = McpeInventoryContent.CreateObject();
+			var containerSetContent = McpeInventoryContent.CreateObject();
 			containerSetContent.inventoryId = 2;
-			containerSetContent.input = new ItemStacks()
-			{
-				Slot0,
-				Slot1
-			};
+			containerSetContent.input = new ItemStacks([Slot0, Slot1]);
+			containerSetContent.containerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
 			player.SendPacket(containerSetContent);
 		}
 
@@ -416,7 +429,7 @@ namespace MiNET.Entities.Passive
 						{
 							new NbtByte("Count", Slot0.Count),
 							new NbtShort("Damage", Slot0.Metadata),
-							new NbtShort("id", Slot0.Id),
+							new NbtShort("id", Slot0.LegacyId),
 						},
 						new NbtInt("slotNumber", 0)
 					},
@@ -465,7 +478,7 @@ namespace MiNET.Entities.Passive
 						{
 							new NbtByte("Count", Slot1.Count),
 							new NbtShort("Damage", Slot1.Metadata),
-							new NbtShort("id", Slot1.Id),
+							new NbtShort("id", Slot1.LegacyId),
 						},
 						new NbtInt("slotNumber", 1)
 					},

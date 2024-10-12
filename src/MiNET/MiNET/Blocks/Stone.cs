@@ -24,41 +24,23 @@
 #endregion
 
 using MiNET.Items;
-using MiNET.Utils.Vectors;
 using MiNET.Worlds;
-using System.Numerics;
 
 namespace MiNET.Blocks
 {
 	public partial class Stone : Block
 	{
-		public Stone() : base(1)
+		public Stone() : base()
 		{
 			BlastResistance = 30;
 			Hardness = 1.5f;
 		}
 
-		public override Item[] GetDrops(Item tool)
+		public override Item[] GetDrops(Level world, Item tool)
 		{
 			if (tool.ItemType != ItemType.PickAxe) return new Item[0];
 
-			return new[] {new ItemBlock(new Cobblestone(), 0) {Count = 1}}; // Drop cobblestone
-		}
-
-		public override Item GetSmelt()
-		{
-			if (StoneType == "stone")
-			{
-				return ItemFactory.GetItem(-183, 0);
-			}
-			return null;
-		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			var itemInHand = player.Inventory.GetItemInHand();
-			//blockName = ItemFactory.Translator.GetNameByMeta("minecraft:stone", itemInHand.Metadata);
-			return false;
+			return new[] { ItemFactory.GetItem<Cobblestone>() }; // Drop cobblestone
 		}
 	}
 }

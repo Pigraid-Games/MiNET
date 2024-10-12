@@ -14,12 +14,16 @@
   <ItemGroup>
     <None Remove="log4net.xml" />
     <None Remove="server.conf" />
+    <None Remove="server.nicke.conf" />
     <None Update="server.kenny.conf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
     <Content Include="server.conf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="server.nicke.conf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -23,29 +23,12 @@
 
 #endregion
 
-using MiNET.BlockEntities;
-using MiNET.Items;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-using System;
-using System.Numerics;
-
 namespace MiNET.Blocks
 {
 	public partial class Chest : ChestBase
 	{
-		public Chest() : base(54)
+		public Chest() : base()
 		{
 		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			FacingDirection = ItemBlock.GetFacingDirectionFromEntity(player);
-
-			var chestBlockEntity = new ChestBlockEntity { Coordinates = Coordinates };
-			world.SetBlockEntity(chestBlockEntity);
-			return false;
-		}
-
 	}
 }

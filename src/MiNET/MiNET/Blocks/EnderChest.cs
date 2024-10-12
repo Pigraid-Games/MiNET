@@ -23,17 +23,16 @@
 
 #endregion
 
+using System.Numerics;
 using MiNET.Items;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
-using System;
-using System.Numerics;
 
 namespace MiNET.Blocks
 {
-	public partial class EnderChest : ChestBase
+	public partial class EnderChest : Block
 	{
-		public EnderChest() : base(130)
+		public EnderChest() : base()
 		{
 			IsTransparent = true;
 			LightLevel = 7;
@@ -42,15 +41,16 @@ namespace MiNET.Blocks
 			FuelEfficiency = 0;
 		}
 
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
 		{
-			FacingDirection = ItemBlock.GetFacingDirectionFromEntity(player);
-			return false;
+			// each enderchest inventory is a players individual inventory stored in their main inventory
+
+			return base.Interact(world, player, blockCoordinates, face, faceCoord);
 		}
 
-		public override Item[] GetDrops(Item tool)
+		public override Item[] GetDrops(Level world, Item tool)
 		{
-			return new Item[] {ItemFactory.GetItem(49, 0, 8)}; // 8 Obsidian
+			return new Item[] { ItemFactory.GetItem<Obsidian>(count: 8) };
 		}
 	}
 }

@@ -128,11 +128,11 @@ namespace MiNET.Entities
 			foreach (var entity in Level.Entities)
 			{
 				if (!entity.Value.CanDespawn) continue;
-				var tickBlockDistance = Level.TickDistance * 16;
-				if (Level.Players.Count(player => player.Value.IsSpawned && Vector3.Distance(entity.Value.KnownPosition, player.Value.KnownPosition) < tickBlockDistance) == 0)
+
+				if (Level.Players.Count(player => player.Value.IsSpawned && Vector3.Distance(entity.Value.KnownPosition, player.Value.KnownPosition) < 128) == 0)
 				{
 					if (Log.IsDebugEnabled)
-						Log.Debug($"Despawned entity because no players within {tickBlockDistance} blocks distance");
+						Log.Debug($"Despawned entity because no players within 128 blocks distance");
 
 					entity.Value.DespawnEntity();
 				}
@@ -192,7 +192,7 @@ namespace MiNET.Entities
 						var spawnBlock = Level.GetBlock(x, y - 1, z);
 						//FIXME: The following is wrong. It shouldn't be the same for all mobs and need to be moved into some sort of
 						// entity-based "CanSpawn()" method. But performance need to be handled too, and this is way faster right now.
-						if (spawnBlock is Grass || spawnBlock is Sand || spawnBlock is Gravel || (doSpawnHostile && spawnBlock.IsSolid && !spawnBlock.IsTransparent))
+						if (spawnBlock is GrassBlock || spawnBlock is Sand || spawnBlock is Gravel || (doSpawnHostile && spawnBlock.IsSolid && !spawnBlock.IsTransparent))
 						{
 							if (entityType == EntityType.None)
 							{
@@ -214,7 +214,7 @@ namespace MiNET.Entities
 													&& Level.GetSubtractedLight(firstBlock.Coordinates, 0) >= 9)
 								{
 									var secondBlock = Level.GetBlock(x, y + 1, z);
-									if ((spawnBlock is Grass || (entityType == EntityType.Rabbit && spawnBlock is Sand)) && !secondBlock.IsSolid)
+									if ((spawnBlock is GrassBlock || (entityType == EntityType.Rabbit && spawnBlock is Sand)) && !secondBlock.IsSolid)
 									{
 										var yaw = random.Next(360);
 
@@ -294,7 +294,7 @@ namespace MiNET.Entities
 				if (canSpawnPassive) possibleMobs.Add(EntityType.Ocelot);
 			}
 
-			if (spawnBlock.BiomeId == 2 || BiomeUtils.Biomes.Where(biome => biome.Temperature < 0).Count(biome => biome.Id == spawnBlock.BiomeId) == 1)
+			if (spawnBlock.BiomeId == 2 || BiomeUtils.IdBiomeMap.Values.Where(biome => biome.Temperature < 0).Count(biome => biome.Id == spawnBlock.BiomeId) == 1)
 			{
 				// Desert and snowy biomes (except cold taiga) do not spawn animals other than rabbits.
 

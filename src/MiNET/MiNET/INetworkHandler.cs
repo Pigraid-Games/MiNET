@@ -1,4 +1,4 @@
-#region LICENSE
+﻿#region LICENSE
 
 // The contents of this file are subject to the Common Public Attribution
 // License Version 1.0. (the "License"); you may not use this file except in
@@ -30,10 +30,11 @@ namespace MiNET
 {
 	public interface INetworkHandler
 	{
-		void Close();
+		void Close(bool sendDisconnect = true);
 
 		void SendPacket(Packet packet);
 		void SendDirectPacket(Packet packet);
+		void SendPrepareDirectPacket(Packet packet);
 		IPEndPoint GetClientEndPoint();
 		long GetNetworkNetworkIdentifier();
 	}

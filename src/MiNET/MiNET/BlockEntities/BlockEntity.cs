@@ -23,20 +23,36 @@
 
 #endregion
 
+using System;
 using System.Collections.Generic;
 using fNbt;
+using fNbt.Serialization;
+using log4net;
 using MiNET.Items;
-using MiNET.Utils;
+using MiNET.Net;
+using MiNET.Utils.Nbt;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
 namespace MiNET.BlockEntities
 {
-	public class BlockEntity
+	[NbtObject]
+	public abstract class BlockEntity : ICloneable
 	{
-		public string Id { get; private set; }
+		private static readonly ILog Log = LogManager.GetLogger(typeof(BlockEntity));
+
+		[NbtProperty("id")]
+		public string Id { get; }
+
+		public string CustomName { get; set; }
+
+		[NbtProperty("isMovable")]
+		public bool IsMovable { get; set; }
+
+		[NbtFlatProperty(typeof(NbtLowerCaseNamingStrategy))]
 		public BlockCoordinates Coordinates { get; set; }
 
+		[NbtIgnore]
 		public bool UpdatesOnTick { get; set; }
 
 		public BlockEntity(string id)
@@ -46,21 +62,63 @@ namespace MiNET.BlockEntities
 
 		public virtual NbtCompound GetCompound()
 		{
-			return new NbtCompound();
+			return NbtConvert.ToNbt<NbtCompound>(this);
 		}
 
 		public virtual void SetCompound(NbtCompound compound)
 		{
+			NbtConvert.FromNbt(this, compound);
 		}
 
 		public virtual void OnTick(Level level)
 		{
 		}
 
+		public virtual void SendData(Player player)
+		{
+			var tag = GetCompound();
+			var nbt = new Nbt() { NbtFile = new NbtFile(tag) { Flavor = NbtFlavor.Bedrock } };
+
+			if (Log.IsDebugEnabled) Log.Debug($"Nbt: {nbt.NbtFile.RootTag}");
+
+			var entityData = McpeBlockEntityData.CreateObject();
+			entityData.namedtag = nbt;
+			entityData.coordinates = Coordinates;
+			player.SendPacket(entityData);
+		}
+
+		public virtual void SendData(Level level)
+		{
+			var tag = GetCompound();
+			var nbt = new Nbt() { NbtFile = new NbtFile(tag) { Flavor = NbtFlavor.Bedrock } };
+
+			if (Log.IsDebugEnabled) Log.Debug($"Nbt: {nbt.NbtFile.RootTag}");
+
+			var entityData = McpeBlockEntityData.CreateObject();
+			entityData.namedtag = nbt;
+			entityData.coordinates = Coordinates;
+			level.RelayBroadcast(entityData);
+		}
+
+		public virtual void RemoveBlockEntity(Level level)
+		{
+
+		}
 
 		public virtual List<Item> GetDrops()
 		{
-			return new List<Item>();
+			return [];
+		}
+
+		public virtual object Clone()
+		{
+			// Slow, but common solution. Recommended to implement real clone.
+
+			var type = GetType();
+			var clone = Activator.CreateInstance(type);
+
+			var settings = new NbtSerializerSettings() { Flavor = NbtFlavor.BedrockNoVarInt };
+			return NbtConvert.FromNbt(clone, NbtConvert.ToNbt(this, settings), settings);
 		}
 	}
 }

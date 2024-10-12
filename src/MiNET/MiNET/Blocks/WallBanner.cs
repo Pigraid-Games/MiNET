@@ -23,7 +23,6 @@
 
 #endregion
 
-using System;
 using System.Numerics;
 using fNbt;
 using MiNET.BlockEntities;
@@ -38,7 +37,7 @@ namespace MiNET.Blocks
 		public int Base { get; set; }
 		public NbtCompound ExtraData { get; set; }
 
-		public WallBanner() : base(177)
+		public WallBanner() : base()
 		{
 		}
 
@@ -54,10 +53,7 @@ namespace MiNET.Blocks
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates targetCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			var itemInHand = player.Inventory.GetItemInHand();
-			Base = Convert.ToByte(itemInHand.Metadata);
-
-			FacingDirection = (int) face;
+			FacingDirection = face;
 
 			var bannerBlockEntity = new BannerBlockEntity
 			{

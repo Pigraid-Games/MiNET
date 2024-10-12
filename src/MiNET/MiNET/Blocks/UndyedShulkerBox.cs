@@ -25,7 +25,6 @@
 
 using System.Numerics;
 using MiNET.BlockEntities;
-using MiNET.Items;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -33,7 +32,7 @@ namespace MiNET.Blocks
 {
 	public partial class UndyedShulkerBox : Block
 	{
-		public UndyedShulkerBox() : base(205)
+		public UndyedShulkerBox() : base()
 		{
 			IsTransparent = true;
 			BlastResistance = 30f;

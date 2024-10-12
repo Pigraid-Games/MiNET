@@ -24,8 +24,6 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using log4net;
 using MiNET.Items;
@@ -36,17 +34,11 @@ using MiNET.Worlds;
 
 namespace MiNET.Blocks
 {
-	public class Block : ICloneable
+	public abstract class Block : BlockStateContainer, ICloneable
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(Block));
 
-		public bool IsGenerated { get; protected set; } = false;
-
 		public BlockCoordinates Coordinates { get; set; }
-
-		public virtual string Name { get; protected set; }
-		public int Id { get; }
-		public byte Metadata { get; set; }
 
 		public float Hardness { get; protected set; } = 0;
 		public float BlastResistance { get; protected set; } = 0;
@@ -61,187 +53,21 @@ namespace MiNET.Blocks
 		public bool IsFlammable { get; protected set; } = false;
 		public bool IsBlockingSkylight { get; protected set; } = true;
 
+		public bool Edu { get; protected set; } = false;
+
 		public byte BlockLight { get; set; }
 		public byte SkyLight { get; set; }
 
 		public byte BiomeId { get; set; }
 
-		//TODO: Update ALL blocks with names.
-		public Block(string name, int id)
+		protected Block()
 		{
-			Name = name;
-			Id = id;
+
 		}
 
-		public Block(int id) : this(string.Empty, id)
+		public virtual Item GetItem(Level world, bool blockItem = false)
 		{
-		}
-
-		public virtual void SetState(BlockStateContainer blockstate)
-		{
-			SetState(blockstate.States);
-		}
-
-		public virtual void SetState(List<IBlockState> states)
-		{
-		}
-
-		public virtual BlockStateContainer GetState()
-		{
-			return null;
-		}
-
-		public virtual int GetDirection()
-		{
-			foreach (var state in GetState().States)
-			{
-				if (state is BlockStateInt s && s.Name == "direction")
-				{
-					return s.Value;
-				}
-			}
-			return 0;
-		}
-
-		public virtual BlockStateContainer GetGlobalState()
-		{
-			BlockStateContainer currentState = GetState();
-			if (!BlockFactory.BlockStates.TryGetValue(currentState, out var blockstate))
-			{
-				Log.Warn($"Did not find block state for {this}, {currentState}");
-				return null;
-			}
-
-			return blockstate;
-		}
-
-		public int GetRuntimeId()
-		{
-			BlockStateContainer currentState = GetState();
-			if (!BlockFactory.BlockStates.TryGetValue(currentState, out var blockstate))
-			{
-				Log.Warn($"Did not find block state for {this}, {currentState}");
-				return -1;
-			}
-
-			return blockstate.RuntimeId;
-		}
-
-		public virtual Item GetItem()
-		{
-			if (!BlockFactory.BlockStates.TryGetValue(GetState(), out BlockStateContainer stateFromPick)) return null;
-
-			if (stateFromPick.ItemInstance != null) return ItemFactory.GetItem(stateFromPick.ItemInstance.Id, stateFromPick.ItemInstance.Metadata);
-
-			// The rest of this code is to search for an state with the proper value. This is caused by blocks that have lots
-			// of states, and no easy way to map 1-1 with meta. Expensive, but rare.
-
-			// Only compare with states that actually have the values we checking for, and have meta.
-			var statesWithMeta = BlockFactory.BlockPalette.Values.Where(b => b.Name == stateFromPick.Name && b.Data != -1).ToList();
-			foreach (IBlockState state in stateFromPick.States.ToArray())
-			{
-				bool remove = true;
-				foreach (BlockStateContainer blockStateContainer in statesWithMeta)
-				{
-					foreach (IBlockState currentState in blockStateContainer.States)
-					{
-						if (currentState.Name != state.Name) continue;
-
-						if (!currentState.Equals(state))
-						{
-							remove = false;
-							break;
-						}
-					}
-				}
-				if (remove) stateFromPick.States.Remove(state);
-			}
-
-			foreach (BlockStateContainer blockStateContainer in statesWithMeta)
-			{
-				bool match = true;
-
-				foreach (IBlockState currentState in blockStateContainer.States)
-				{
-					if (stateFromPick.States.All(s => s.Name != currentState.Name)) continue;
-
-					if (stateFromPick.States.All(state => !state.Equals(currentState)))
-					{
-						Log.Debug($"State: {currentState.Name}, {currentState}");
-
-						match = false;
-						break;
-					}
-				}
-				if (match)
-				{
-					var id = blockStateContainer.Id;
-					var meta = blockStateContainer.Data;
-
-					var statesWithMetaAndItem = statesWithMeta.Where(b => b.ItemInstance != null).ToList();
-					var actualState = statesWithMetaAndItem.FirstOrDefault(s => s.Id == id && s.Data == meta && s.ItemInstance != null);
-					if (actualState == null) break;
-					return ItemFactory.GetItem(actualState.ItemInstance.Id, actualState.ItemInstance.Metadata);
-				}
-			}
-
-			// Ok that didn't give an item. Lets try more stuff.
-
-			// Remove states that repeat. They can not contribute to a meta-variant.
-			//BUG: There might be states that have more than one. Don't know.
-			foreach (BlockStateContainer stateContainer in statesWithMeta)
-			{
-				foreach (var state in stateContainer.States.ToArray())
-				{
-					var states = statesWithMeta.SelectMany(m => m.States).ToList();
-					if (states.Count(s => s.Equals(state)) > 1)
-					{
-						if (stateFromPick.States.FirstOrDefault(s => s.Name == state.Name) != null)
-						{
-							stateFromPick.States.Remove(stateFromPick.States.First(s => s.Name == state.Name));
-						}
-					}
-				}
-			}
-
-			if(stateFromPick.States.Count == 0)
-			{
-				var stateToPick = statesWithMeta.FirstOrDefault();
-				if (stateToPick?.ItemInstance != null)
-				{
-					return ItemFactory.GetItem(stateToPick.ItemInstance.Id, stateToPick.ItemInstance.Metadata);
-				}
-			}
-
-			foreach (BlockStateContainer blockStateContainer in statesWithMeta)
-			{
-				bool match = true;
-
-				foreach (IBlockState currentState in blockStateContainer.States)
-				{
-					if (stateFromPick.States.All(s => s.Name != currentState.Name)) continue;
-
-					if (stateFromPick.States.All(state => !state.Equals(currentState)))
-					{
-						Log.Debug($"State: {currentState.Name}, {currentState}");
-
-						match = false;
-						break;
-					}
-				}
-				if (match)
-				{
-					var id = blockStateContainer.Id;
-					var meta = blockStateContainer.Data;
-
-					var statesWithMetaAndItem = statesWithMeta.Where(b => b.ItemInstance != null).ToList();
-					var actualState = statesWithMetaAndItem.FirstOrDefault(s => s.Id == id && s.Data == meta && s.ItemInstance != null);
-					if (actualState == null) break;
-					return ItemFactory.GetItem(actualState.ItemInstance.Id, actualState.ItemInstance.Metadata);
-				}
-			}
-
-			return null;
+			return ItemFactory.GetItem(Id);
 		}
 
 		public bool CanPlace(Level world, Player player, BlockCoordinates targetCoordinates, BlockFace face)
@@ -265,16 +91,15 @@ namespace MiNET.Blocks
 
 		public virtual void BreakBlock(Level world, BlockFace face, bool silent = false)
 		{
-			var runtimeId = BlockFactory.GetRuntimeId(this.Id, this.Metadata);
+			world.SetAir(Coordinates);
+
 			if (!silent)
 			{
-				var particle = new DestroyBlockParticle(world, Coordinates, runtimeId);
+				var particle = new DestroyBlockParticle(world, this);
 				particle.Spawn();
 			}
 
-			world.SetAir(Coordinates);
 			UpdateBlocks(world);
-			world.BroadcastSound(Coordinates, LevelSoundEventType.BreakBlock, Id);
 		}
 
 		protected void UpdateBlocks(Level world)
@@ -301,6 +126,10 @@ namespace MiNET.Blocks
 		{
 			// No default interaction. Return unhandled.
 			return false;
+		}
+
+		public virtual void UseItem(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face)
+		{
 		}
 
 		public virtual void OnTick(Level level, bool isRandom)
@@ -343,17 +172,15 @@ namespace MiNET.Blocks
 			}
 		}
 
-		public virtual Item[] GetDrops(Item tool)
+		public virtual Item[] GetDrops(Level world, Item tool)
 		{
-			var item = GetItem();
+			var item = GetItem(world);
 			if (item == null) return new Item[0];
 
-			item.Count = 1;
-
-			return new[] {item};
+			return new[] { item };
 		}
 
-		public virtual Item GetSmelt()
+		public virtual Item GetSmelt(string block)
 		{
 			return null;
 		}
@@ -372,15 +199,32 @@ namespace MiNET.Blocks
 			return new BoundingBox(Coordinates, Coordinates + 1);
 		}
 
-
-		public object Clone()
+		public virtual object Clone()
 		{
 			return MemberwiseClone();
 		}
 
+		protected virtual bool Equals(Block other)
+		{
+			return RuntimeId == other.RuntimeId;
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (ReferenceEquals(null, obj)) return false;
+			if (ReferenceEquals(this, obj)) return true;
+			if (!(obj is Block)) return false;
+			return Equals((Block) obj);
+		}
+
+		public override int GetHashCode()
+		{
+			return base.GetHashCode();
+		}
+
 		public override string ToString()
 		{
-			return $"Id: {Id}, Metadata: {GetState()}, Coordinates: {Coordinates}";
+			return $"{base.ToString()}, Coordinates: {Coordinates}";
 		}
 	}
 

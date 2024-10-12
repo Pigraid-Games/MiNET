@@ -25,11 +25,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
+using System.Text;
+using fNbt;
 using log4net;
-using MiNET.Items;
+using MiNET.Net;
 using MiNET.Utils;
 
 namespace MiNET.Blocks
@@ -38,6 +40,20 @@ namespace MiNET.Blocks
 	{
 		Block GetBlockById(int blockId);
 	}
+
+	public class R12ToCurrentBlockMapEntry
+	{
+		public string StringId { get; set; }
+		public short Meta { get; set; }
+		public IBlockStateContainer State { get; set; }
+
+		public R12ToCurrentBlockMapEntry(string id, short meta, IBlockStateContainer state)
+		{
+			StringId = id;
+			Meta = meta;
+			State = state;
+		}
+	}
 	
 	public static class BlockFactory
 	{
@@ -45,532 +61,389 @@ namespace MiNET.Blocks
 
 		public static ICustomBlockFactory CustomBlockFactory { get; set; }
 
-		public static readonly byte[] TransparentBlocks = new byte[600];
-		public static readonly byte[] LuminousBlocks = new byte[600];
-		public static Dictionary<string, int> NameToId { get; private set; }
-		public static BlockPalette BlockPalette { get; set; } = null;
-		public static HashSet<BlockStateContainer> BlockStates { get; set; } = null;
+		public static byte[] TransparentBlocks { get; private set; }
+		public static byte[] LuminousBlocks { get; private set; }
 
-		public static int[] LegacyToRuntimeId = new int[65536];
+		public static Dictionary<string, IBlockStateContainer> MetaBlockNameToState { get; private set; } = new Dictionary<string, IBlockStateContainer>();
+		public static List<string> RuntimeIdToId { get; private set; }
+		public static Dictionary<string, Type> IdToType { get; private set; } = new Dictionary<string, Type>();
+		public static Dictionary<Type, string> TypeToId { get; private set; } = new Dictionary<Type, string>();
+		public static Dictionary<string, Func<Block>> IdToFactory { get; private set; } = new Dictionary<string, Func<Block>>();
+		public static Dictionary<string, string> ItemToBlock { get; private set; }
+
+		public static List<string> Ids { get; set; }
+		public static BlockPalette BlockPalette { get; } = new BlockPalette();
+		public static HashSet<IBlockStateContainer> BlockStates { get; set; }
+
+		private static readonly object _lockObj = new object();
 
 		static BlockFactory()
 		{
-			for (int i = 0; i < byte.MaxValue * 2; i++)
-			{
-				var block = GetBlockById(i);
-				if (block != null)
-				{
-					if (block.IsTransparent)
-					{
-						TransparentBlocks[block.Id] = 1;
-					}
-					if (block.LightLevel > 0)
-					{
-						LuminousBlocks[block.Id] = (byte) block.LightLevel;
-					}
-				}
-			}
-
-			NameToId = BuildNameToId();
-
-			for (int i = 0; i < LegacyToRuntimeId.Length; ++i)
-			{
-				LegacyToRuntimeId[i] = -1;
-			}
-
 			var assembly = Assembly.GetAssembly(typeof(Block));
 
-			lock (lockObj)
+			lock (_lockObj)
 			{
-				BlockPalette = new BlockPalette();
-				
-				using (var stream = assembly.GetManifestResourceStream("MiNET.Resources.blockstates.json"))
-				using (StreamReader reader = new StreamReader(stream))
+				int runtimeId = 0;
+				var ids = new HashSet<string>();
+
+				using (var stream = assembly.GetManifestResourceStream(typeof(BlockFactory).Namespace + ".Data.canonical_block_states.nbt"))
 				{
-					BlockPalette = BlockPalette.FromJson(reader.ReadToEnd());
-				}
-				int palletSize = BlockPalette.Count;
+					do
+					{
+						var compound = Packet.ReadNbtCompound(stream, true);
+						var container = GetBlockStateContainer(compound);
 
-				foreach (var blockStateContainer in BlockPalette.Values)
-				{
-					LegacyToRuntimeId[(blockStateContainer.Id << 4) | (byte) blockStateContainer.Data] = blockStateContainer.RuntimeId;
-				}
-			}
-			
-			BlockStates = new HashSet<BlockStateContainer>(BlockPalette.Values);
-		}
-
-		private static object lockObj = new object();
-
-		private static Dictionary<string, int> BuildNameToId()
-		{
-			//TODO: Refactor to use the Item.Name in hashed set instead.
-
-			var nameToId = new Dictionary<string, int>();
-			for (int idx = 0; idx < 1000; idx++)
-			{
-				Block block = GetBlockById(idx);
-				string name = block.GetType().Name.ToLowerInvariant();
-				//Log.Error($"factory name {name}");
-				if (name.Equals("block"))
-				{
-					//if (Log.IsDebugEnabled)
-					//	Log.Debug($"Missing implementation for block ID={idx}");
-					continue;
+						container.RuntimeId = runtimeId++;
+						ids.Add(container.Id);
+						BlockPalette.Add(container);
+					} while (stream.Position < stream.Length);
 				}
 
-				nameToId.Add(name, idx);
-			}
+				Ids = ids.ToList();
 
-			return nameToId;
+				var visitedContainers = new HashSet<IBlockStateContainer>();
+				var blockMapEntry = new List<R12ToCurrentBlockMapEntry>();
+
+				using (var stream = assembly.GetManifestResourceStream(typeof(BlockFactory).Namespace + ".Data.r12_to_current_block_map.bin"))
+				{
+					while (stream.Position < stream.Length)
+					{
+						var length = VarInt.ReadUInt32(stream);
+						byte[] bytes = new byte[length];
+						stream.Read(bytes, 0, bytes.Length);
+
+						string stringId = Encoding.UTF8.GetString(bytes);
+
+						bytes = new byte[2];
+						stream.Read(bytes, 0, bytes.Length);
+						var meta = BitConverter.ToInt16(bytes);
+
+						var compound = Packet.ReadNbtCompound(stream, true);
+
+						var state = GetBlockStateContainer(compound);
+
+						if (!visitedContainers.TryGetValue(state, out _))
+						{
+							blockMapEntry.Add(new R12ToCurrentBlockMapEntry(stringId, meta, state));
+							visitedContainers.Add(state);
+						}
+					}
+				}
+
+				Dictionary<string, List<int>> idToStatesMap = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+
+				Dictionary<string, string> blockIdItemIdMap = ResourceUtil.ReadResource<Dictionary<string, string>>("block_id_to_item_id_map.json", typeof(BlockFactory), "Data");
+				ItemToBlock = blockIdItemIdMap.ToDictionary(pair => pair.Value, pair => pair.Key);
+
+				for (var index = 0; index < BlockPalette.Count; index++)
+				{
+					var state = BlockPalette[index];
+					if (!idToStatesMap.TryGetValue(state.Id, out var candidates))
+					{
+						candidates = new List<int>();
+					}
+
+					candidates.Add(index);
+					idToStatesMap[state.Id] = candidates;
+				}
+
+				foreach (var entry in blockMapEntry)
+				{
+					var data = entry.Meta;
+
+					var mappedState = entry.State;
+					var mappedName = entry.State.Id;
+
+					if (!idToStatesMap.TryGetValue(mappedName, out var matching))
+					{
+						continue;
+					}
+
+					foreach (var match in matching)
+					{
+						var networkState = BlockPalette[match];
+
+						var thisStates = new HashSet<IBlockState>(mappedState.States);
+						var otherStates = new HashSet<IBlockState>(networkState.States);
+
+						otherStates.IntersectWith(thisStates);
+
+						if (otherStates.Count == thisStates.Count)
+						{
+							((PaletteBlockStateContainer)BlockPalette[match]).Data = data;
+
+							var id = blockIdItemIdMap.GetValueOrDefault(mappedName, mappedName);
+
+							break;
+						}
+					}
+				}
+
+				foreach (PaletteBlockStateContainer record in BlockPalette)
+				{
+					var states = new List<NbtTag>();
+					foreach (IBlockState state in record.States)
+					{
+						NbtTag stateTag = null;
+						switch (state)
+						{
+							case BlockStateByte blockStateByte:
+								stateTag = new NbtByte(state.Name, blockStateByte.Value);
+								break;
+							case BlockStateInt blockStateInt:
+								stateTag = new NbtInt(state.Name, blockStateInt.Value);
+								break;
+							case BlockStateString blockStateString:
+								stateTag = new NbtString(state.Name, blockStateString.Value);
+								break;
+							default:
+								throw new ArgumentOutOfRangeException(nameof(state));
+						}
+						states.Add(stateTag);
+					}
+
+					record.StatesNbt = new NbtCompound("states", states);
+
+					var nbt = new NbtFile()
+					{
+						Flavor = NbtFlavor.Bedrock,
+						RootTag = record.StatesNbt
+					};
+
+					byte[] nbtBinary = nbt.SaveToBuffer(NbtCompression.None);
+
+					record.StatesCacheNbt = nbtBinary;
+
+					MetaBlockNameToState.TryAdd(GetMetaBlockName(record.Id, record.Data), record);
+				}
+
+				BlockStates = new HashSet<IBlockStateContainer>(BlockPalette);
+
+				(IdToType, TypeToId) = BuildIdTypeMapPair();
+				IdToFactory = BuildIdToFactory();
+				RuntimeIdToId = BuildRuntimeIdToId();
+				(TransparentBlocks, LuminousBlocks) = BuildTransperentAndLuminousMapPair();
+			}
 		}
 
-		public static int GetBlockIdByName(string blockName)
+		internal static PaletteBlockStateContainer GetBlockStateContainer(NbtTag tag)
 		{
-			blockName = blockName.ToLowerInvariant().Replace("_", "").Replace("minecraft:", "");
+			string name = tag["name"].StringValue;
 
-			if (NameToId.ContainsKey(blockName))
+			return new PaletteBlockStateContainer(name, GetBlockStates(tag));
+		}
+
+		public static List<IBlockState> GetBlockStates(NbtTag tag)
+		{
+			var result = new List<IBlockState>();
+
+			var states = tag["states"] ?? tag;
+			if (states != null && states is NbtCompound compound)
 			{
-				return NameToId[blockName];
+				foreach (var stateEntry in compound)
+				{
+					switch (stateEntry)
+					{
+						case NbtInt nbtInt:
+							result.Add(new BlockStateInt()
+							{
+								Name = nbtInt.Name,
+								Value = nbtInt.Value
+							});
+							break;
+						case NbtByte nbtByte:
+							result.Add(new BlockStateByte()
+							{
+								Name = nbtByte.Name,
+								Value = nbtByte.Value
+							});
+							break;
+						case NbtString nbtString:
+							result.Add(new BlockStateString()
+							{
+								Name = nbtString.Name,
+								Value = nbtString.Value
+							});
+							break;
+					}
+				}
 			}
 
-			return 0;
+			return result;
 		}
 
-		public static Block GetBlockByName(string blockName)
+		public static string GetBlockIdFromItemId(string id)
 		{
-			if (string.IsNullOrEmpty(blockName)) return null;
+			return ItemToBlock.GetValueOrDefault(id);
+		}
 
-			blockName = blockName.ToLowerInvariant().Replace("_", "").Replace("minecraft:", "");
+		public static string GetIdByType<T>(bool withRoot = true) where T : Block
+		{
+			return GetIdByType(typeof(T), withRoot);
+		}
 
-			if (NameToId.ContainsKey(blockName))
+		public static string GetIdByType(Type type, bool withRoot = true)
+		{
+			return withRoot 
+				? TypeToId.GetValueOrDefault(type)
+				: TypeToId.GetValueOrDefault(type).Replace("minecraft:", "");
+		}
+
+		public static string GetIdByRuntimeId(int id)
+		{
+			return id > 0 && id < RuntimeIdToId.Count ? RuntimeIdToId[id] : null;
+		}
+
+		[Obsolete("Use block states")]
+		public static Block GetBlockById(string id, short metadata)
+		{
+			var block = GetBlockById(id);
+
+			if (!MetaBlockNameToState.TryGetValue(GetMetaBlockName(id, metadata), out var map))
 			{
-				return GetBlockById(NameToId[blockName]);
+				return block;
 			}
 
+			block.SetStates(map.States);
 
-			return null;
-		}
-
-		public static Block GetBlockById(int blockId, byte metadata)
-		{
-			int runtimeId = (int) GetRuntimeId(blockId, metadata);
-			if (runtimeId < 0 || runtimeId >= BlockPalette.Count) return null;
-			BlockStateContainer blockState = BlockPalette[runtimeId];
-			Block block = GetBlockById(blockState.Id);
-			block.SetState(blockState.States);
 			return block;
+		}
+
+		public static T GetBlockById<T>(string id) where T : Block
+		{
+			return (T) GetBlockById(id);
+		}
+
+		public static Block GetBlockById(string id)
+		{
+			if (string.IsNullOrEmpty(id)) return null;
+			
+			return IdToFactory.GetValueOrDefault(id)?.Invoke();
 		}
 
 		public static Block GetBlockByRuntimeId(int runtimeId)
 		{
-			BlockStateContainer blockState = BlockPalette[runtimeId];
-			Block block = GetBlockById(blockState.Id);
-			block.SetState(blockState.States);
-			return block;
-		}
+			if (runtimeId < 0 || runtimeId >= BlockPalette.Count) return null;
 
-		public static Block GetBlockById(int blockId)
-		{
-			Block block = null;
+			var blockState = BlockPalette[runtimeId];
+			var block = GetBlockById(blockState.Id);
 
-			if (CustomBlockFactory != null) block = CustomBlockFactory.GetBlockById(blockId);
-
-			if (block != null) return block;
-
-			block = blockId switch
+			if (block != null)
 			{
-				0 => new Air(),
-				1 => new Stone(),
-				2 => new Grass(),
-				3 => new Dirt(),
-				4 => new Cobblestone(),
-				5 => new Planks(),
-				6 => new Sapling(),
-				7 => new Bedrock(),
-				8 => new FlowingWater(),
-				9 => new Water(),
-				10 => new FlowingLava(),
-				11 => new Lava(),
-				12 => new Sand(),
-				13 => new Gravel(),
-				14 => new GoldOre(),
-				15 => new IronOre(),
-				16 => new CoalOre(),
-				17 => new Log(),
-				18 => new Leaves(),
-				19 => new Sponge(),
-				20 => new Glass(),
-				21 => new LapisOre(),
-				22 => new LapisBlock(),
-				23 => new Dispenser(),
-				24 => new Sandstone(),
-				25 => new Noteblock(),
-				26 => new Bed(),
-				27 => new GoldenRail(),
-				28 => new DetectorRail(),
-				29 => new StickyPiston(),
-				30 => new Web(),
-				31 => new Tallgrass(),
-				32 => new Deadbush(),
-				33 => new Piston(),
-				34 => new PistonArmCollision(),
-				35 => new Wool(),
-				37 => new YellowFlower(),
-				38 => new RedFlower(),
-				39 => new BrownMushroom(),
-				40 => new RedMushroom(),
-				41 => new GoldBlock(),
-				42 => new IronBlock(),
-				43 => new DoubleStoneSlab(),
-				44 => new StoneSlab(),
-				45 => new BrickBlock(),
-				46 => new Tnt(),
-				47 => new Bookshelf(),
-				48 => new MossyCobblestone(),
-				49 => new Obsidian(),
-				50 => new Torch(),
-				51 => new Fire(),
-				52 => new MobSpawner(),
-				53 => new OakStairs(),
-				54 => new Chest(),
-				55 => new RedstoneWire(),
-				56 => new DiamondOre(),
-				57 => new DiamondBlock(),
-				58 => new CraftingTable(),
-				59 => new Wheat(),
-				60 => new Farmland(),
-				61 => new Furnace(),
-				62 => new LitFurnace(),
-				63 => new StandingSign(),
-				64 => new WoodenDoor(),
-				65 => new Ladder(),
-				66 => new Rail(),
-				67 => new StoneStairs(),
-				68 => new WallSign(),
-				69 => new Lever(),
-				70 => new StonePressurePlate(),
-				71 => new IronDoor(),
-				72 => new WoodenPressurePlate(),
-				73 => new RedstoneOre(),
-				74 => new LitRedstoneOre(),
-				75 => new UnlitRedstoneTorch(),
-				76 => new RedstoneTorch(),
-				77 => new StoneButton(),
-				78 => new SnowLayer(),
-				79 => new Ice(),
-				80 => new Snow(),
-				81 => new Cactus(),
-				82 => new Clay(),
-				83 => new Reeds(),
-				84 => new Jukebox(),
-				85 => new Fence(),
-				86 => new Pumpkin(),
-				87 => new Netherrack(),
-				88 => new SoulSand(),
-				89 => new Glowstone(),
-				90 => new Portal(),
-				91 => new LitPumpkin(),
-				92 => new Cake(),
-				93 => new UnpoweredRepeater(),
-				94 => new PoweredRepeater(),
-				95 => new InvisibleBedrock(),
-				96 => new Trapdoor(),
-				97 => new MonsterEgg(),
-				98 => new Stonebrick(),
-				99 => new BrownMushroomBlock(),
-				100 => new RedMushroomBlock(),
-				101 => new IronBars(),
-				102 => new GlassPane(),
-				103 => new MelonBlock(),
-				104 => new PumpkinStem(),
-				105 => new MelonStem(),
-				106 => new Vine(),
-				107 => new FenceGate(),
-				108 => new BrickStairs(),
-				109 => new StoneBrickStairs(),
-				110 => new Mycelium(),
-				111 => new Waterlily(),
-				112 => new NetherBrick(),
-				113 => new NetherBrickFence(),
-				114 => new NetherBrickStairs(),
-				115 => new NetherWart(),
-				116 => new EnchantingTable(),
-				117 => new BrewingStand(),
-				118 => new Cauldron(),
-				119 => new EndPortal(),
-				120 => new EndPortalFrame(),
-				121 => new EndStone(),
-				122 => new DragonEgg(),
-				123 => new RedstoneLamp(),
-				124 => new LitRedstoneLamp(),
-				125 => new Dropper(),
-				126 => new ActivatorRail(),
-				127 => new Cocoa(),
-				128 => new SandstoneStairs(),
-				129 => new EmeraldOre(),
-				130 => new EnderChest(),
-				131 => new TripwireHook(),
-				132 => new TripWire(),
-				133 => new EmeraldBlock(),
-				134 => new SpruceStairs(),
-				135 => new BirchStairs(),
-				136 => new JungleStairs(),
-				137 => new CommandBlock(),
-				138 => new Beacon(),
-				139 => new CobblestoneWall(),
-				140 => new FlowerPot(),
-				141 => new Carrots(),
-				142 => new Potatoes(),
-				143 => new WoodenButton(),
-				144 => new Skull(),
-				145 => new Anvil(),
-				146 => new TrappedChest(),
-				147 => new LightWeightedPressurePlate(),
-				148 => new HeavyWeightedPressurePlate(),
-				149 => new UnpoweredComparator(),
-				150 => new PoweredComparator(),
-				151 => new DaylightDetector(),
-				152 => new RedstoneBlock(),
-				153 => new QuartzOre(),
-				154 => new Hopper(),
-				155 => new QuartzBlock(),
-				156 => new QuartzStairs(),
-				157 => new DoubleWoodenSlab(),
-				158 => new WoodenSlab(),
-				159 => new StainedHardenedClay(),
-				160 => new StainedGlassPane(),
-				161 => new Leaves2(),
-				162 => new Log2(),
-				163 => new AcaciaStairs(),
-				164 => new DarkOakStairs(),
-				165 => new Slime(),
-				167 => new IronTrapdoor(),
-				168 => new Prismarine(),
-				169 => new SeaLantern(),
-				170 => new HayBlock(),
-				171 => new Carpet(),
-				172 => new HardenedClay(),
-				173 => new CoalBlock(),
-				174 => new PackedIce(),
-				175 => new DoublePlant(),
-				176 => new StandingBanner(),
-				177 => new WallBanner(),
-				178 => new DaylightDetectorInverted(),
-				179 => new RedSandstone(),
-				180 => new RedSandstoneStairs(),
-				181 => new DoubleStoneSlab2(),
-				182 => new StoneSlab2(),
-				183 => new SpruceFenceGate(),
-				184 => new BirchFenceGate(),
-				185 => new JungleFenceGate(),
-				186 => new DarkOakFenceGate(),
-				187 => new AcaciaFenceGate(),
-				188 => new RepeatingCommandBlock(),
-				189 => new ChainCommandBlock(),
-				193 => new SpruceDoor(),
-				194 => new BirchDoor(),
-				195 => new JungleDoor(),
-				196 => new AcaciaDoor(),
-				197 => new DarkOakDoor(),
-				198 => new GrassPath(),
-				199 => new Frame(),
-				200 => new ChorusFlower(),
-				201 => new PurpurBlock(),
-				203 => new PurpurStairs(),
-				205 => new UndyedShulkerBox(),
-				206 => new EndBricks(),
-				207 => new FrostedIce(),
-				208 => new EndRod(),
-				209 => new EndGateway(),
-				210 => new Allow(),
-				211 => new Deny(),
-				212 => new BorderBlock(),
-				213 => new Magma(),
-				214 => new NetherWartBlock(),
-				215 => new RedNetherBrick(),
-				216 => new BoneBlock(),
-				217 => new StructureVoid(),
-				218 => new ShulkerBox(),
-				219 => new PurpleGlazedTerracotta(),
-				220 => new WhiteGlazedTerracotta(),
-				221 => new OrangeGlazedTerracotta(),
-				222 => new MagentaGlazedTerracotta(),
-				223 => new LightBlueGlazedTerracotta(),
-				224 => new YellowGlazedTerracotta(),
-				225 => new LimeGlazedTerracotta(),
-				226 => new PinkGlazedTerracotta(),
-				227 => new GrayGlazedTerracotta(),
-				228 => new SilverGlazedTerracotta(),
-				229 => new CyanGlazedTerracotta(),
-				231 => new BlueGlazedTerracotta(),
-				232 => new BrownGlazedTerracotta(),
-				233 => new GreenGlazedTerracotta(),
-				234 => new RedGlazedTerracotta(),
-				235 => new BlackGlazedTerracotta(),
-				236 => new Concrete(),
-				237 => new ConcretePowder(),
-				240 => new ChorusPlant(),
-				241 => new StainedGlass(),
-				243 => new Podzol(),
-				244 => new Beetroot(),
-				245 => new Stonecutter(),
-				246 => new Glowingobsidian(),
-				247 => new Netherreactor(),
-				248 => new InfoUpdate(),
-				249 => new InfoUpdate2(),
-				251 => new Observer(),
-				252 => new StructureBlock(),
-				255 => new Reserved6(),
-				257 => new PrismarineStairs(),
-				258 => new DarkPrismarineStairs(),
-				259 => new PrismarineBricksStairs(),
-				260 => new StrippedSpruceLog(),
-				261 => new StrippedBirchLog(),
-				262 => new StrippedJungleLog(),
-				263 => new StrippedAcaciaLog(),
-				264 => new StrippedDarkOakLog(),
-				265 => new StrippedOakLog(),
-				266 => new BlueIce(),
-				385 => new Seagrass(),
-				386 => new Coral(),
-				387 => new CoralBlock(),
-				388 => new CoralFan(),
-				389 => new CoralFanDead(),
-				390 => new CoralFanHang(),
-				391 => new CoralFanHang2(),
-				392 => new CoralFanHang3(),
-				393 => new Kelp(),
-				394 => new DriedKelpBlock(),
-				395 => new AcaciaButton(),
-				396 => new BirchButton(),
-				397 => new DarkOakButton(),
-				398 => new JungleButton(),
-				399 => new SpruceButton(),
-				400 => new AcaciaTrapdoor(),
-				401 => new BirchTrapdoor(),
-				402 => new DarkOakTrapdoor(),
-				403 => new JungleTrapdoor(),
-				404 => new SpruceTrapdoor(),
-				405 => new AcaciaPressurePlate(),
-				406 => new BirchPressurePlate(),
-				407 => new DarkOakPressurePlate(),
-				408 => new JunglePressurePlate(),
-				409 => new SprucePressurePlate(),
-				410 => new CarvedPumpkin(),
-				411 => new SeaPickle(),
-				412 => new Conduit(),
-				414 => new TurtleEgg(),
-				415 => new BubbleColumn(),
-				416 => new Barrier(),
-				417 => new StoneSlab3(),
-				418 => new Bamboo(),
-				419 => new BambooSapling(),
-				420 => new Scaffolding(),
-				421 => new StoneSlab4(),
-				422 => new DoubleStoneSlab3(),
-				423 => new DoubleStoneSlab4(),
-				424 => new GraniteStairs(),
-				425 => new DioriteStairs(),
-				426 => new AndesiteStairs(),
-				427 => new PolishedGraniteStairs(),
-				428 => new PolishedDioriteStairs(),
-				429 => new PolishedAndesiteStairs(),
-				430 => new MossyStoneBrickStairs(),
-				431 => new SmoothRedSandstoneStairs(),
-				432 => new SmoothSandstoneStairs(),
-				433 => new EndBrickStairs(),
-				434 => new MossyCobblestoneStairs(),
-				435 => new NormalStoneStairs(),
-				436 => new SpruceStandingSign(),
-				437 => new SpruceWallSign(),
-				438 => new SmoothStone(),
-				439 => new RedNetherBrickStairs(),
-				440 => new SmoothQuartzStairs(),
-				441 => new BirchStandingSign(),
-				442 => new BirchWallSign(),
-				443 => new JungleStandingSign(),
-				444 => new JungleWallSign(),
-				445 => new AcaciaStandingSign(),
-				446 => new AcaciaWallSign(),
-				447 => new DarkoakStandingSign(),
-				448 => new DarkoakWallSign(),
-				449 => new Lectern(),
-				450 => new Grindstone(),
-				451 => new BlastFurnace(),
-				452 => new StonecutterBlock(),
-				453 => new Smoker(),
-				454 => new LitSmoker(),
-				455 => new CartographyTable(),
-				456 => new FletchingTable(),
-				457 => new SmithingTable(),
-				458 => new Barrel(),
-				459 => new Loom(),
-				461 => new Bell(),
-				462 => new SweetBerryBush(),
-				463 => new Lantern(),
-				464 => new Campfire(),
-				467 => new Wood(),
-				468 => new Composter(),
-				469 => new LitBlastFurnace(),
-				471 => new WitherRose(),
-				472 => new StickyPistonArmCollision(),
-				541 => new Chain(),
-				_ => new Block(blockId)
-			};
+				block.SetStates(blockState.States);
+			}
 
 			return block;
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public static uint GetRuntimeId(int blockId, byte metadata)
+		public static bool IsBlock<T>(int runtimeId) where T : Block
 		{
-			int idx = TryGetRuntimeId(blockId, metadata);
-			if (idx != -1)
-			{
-				return (uint) idx;
-			}
-			int idx2 = TryGetRuntimeId(blockId, 0);
-			if (idx2 != -1)
-			{
-				return (uint) idx2;
-			}
-
-			return (uint) TryGetRuntimeId(0, 0);
+			return IsBlock(runtimeId, typeof(T));
 		}
 
-		public static uint GetItemRuntimeId(int blockId, byte metadata)
+		public static bool IsBlock(int runtimeId, Type blockType)
 		{
-			if (blockId < 0)
-			{
-				blockId = 255 + Math.Abs(blockId);
-			}
+			if (runtimeId < 0 || runtimeId >= BlockPalette.Count) return false;
 
-			int idx = TryGetRuntimeId(blockId, metadata);
-			if (idx != -1)
-			{
-				return (uint) idx;
-			}
-			return (uint) TryGetRuntimeId(0, 0);
+			return IsBlock(BlockPalette[runtimeId].Id, blockType);
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static int TryGetRuntimeId(int blockId, byte metadata)
+		public static bool IsBlock<T>(string id) where T : Block
 		{
-			return LegacyToRuntimeId[(blockId << 4) | metadata];
+			return IsBlock(id, typeof(T));
 		}
 
-		public static string getBlockColor(int blockId, byte metadata)
+		public static bool IsBlock(string id, Type blockType)
 		{
-			BlockPalette.TryGetValue((int) GetRuntimeId(blockId, metadata), out BlockStateContainer states);
-			foreach (var state in states.States)
+			if (string.IsNullOrEmpty(id)) return false;
+
+			var type = IdToType.GetValueOrDefault(id);
+
+			return type.IsAssignableTo(blockType);
+		}
+
+		private static (Dictionary<string, Type>, Dictionary<Type, string>) BuildIdTypeMapPair()
+		{
+			var idToType = new Dictionary<string, Type>();
+			var typeToId = new Dictionary<Type, string>();
+
+			var blockTypes = typeof(BlockFactory).Assembly.GetTypes().Where(type => type.IsAssignableTo(typeof(Block)) && !type.IsAbstract);
+
+			foreach (var type in blockTypes)
 			{
-				if (state is BlockStateString s && s.Name == "color")
+				if (type == typeof(Block)) continue;
+
+				var block = (Block) Activator.CreateInstance(type);
+
+				if (string.IsNullOrEmpty(block.Id))
 				{
-					return s.Value;
+					Log.Error($"Detected block without id [{type}]");
+					continue;
+				}
+
+				idToType[block.Id] = type;
+				typeToId[type] = block.Id;
+			}
+
+			return (idToType, typeToId);
+		}
+
+		private static Dictionary<string, Func<Block>> BuildIdToFactory()
+		{
+			var idToFactory = new Dictionary<string, Func<Block>>();
+
+			foreach (var pair in IdToType)
+			{
+				// faster then Activator.CreateInstance
+				var constructorExpression = Expression.New(pair.Value);
+				var lambdaExpression = Expression.Lambda<Func<Block>>(constructorExpression);
+				var createFunc = lambdaExpression.Compile();
+
+				idToFactory.Add(pair.Key, createFunc);
+			}
+
+			return idToFactory;
+		}
+
+		private static (byte[], byte[]) BuildTransperentAndLuminousMapPair()
+		{
+			var transparentBlocks = new byte[BlockPalette.Count];
+			var luminousBlocks = new byte[BlockPalette.Count];
+
+			for (var i = 0; i < BlockPalette.Count; i++)
+			{
+				var block = GetBlockByRuntimeId(i);
+				if (block != null)
+				{
+					if (block.IsTransparent)
+					{
+						transparentBlocks[i] = 1;
+					}
+					if (block.LightLevel > 0)
+					{
+						luminousBlocks[i] = (byte) block.LightLevel;
+					}
 				}
 			}
-			return "";
+
+			return (transparentBlocks, luminousBlocks);
+		}
+
+		private static List<string> BuildRuntimeIdToId()
+		{
+			var runtimeIdToId = new List<string>();
+
+			for (var i = 0; i < BlockPalette.Count; i++)
+			{
+				runtimeIdToId.Add(BlockPalette[i].Id);
+			}
+
+			return runtimeIdToId;
+		}
+
+		private static string GetMetaBlockName(string name, short meta)
+		{
+			return $"{name}:{meta}";
 		}
 	}
 }

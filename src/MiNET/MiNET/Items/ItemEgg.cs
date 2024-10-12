@@ -30,9 +30,9 @@ using MiNET.Worlds;
 
 namespace MiNET.Items
 {
-	public class ItemEgg : Item
+	public partial class ItemEgg
 	{
-		public ItemEgg() : base("minecraft:egg", 344)
+		public ItemEgg() : base()
 		{
 			MaxStackSize = 16;
 		}
@@ -41,10 +41,11 @@ namespace MiNET.Items
 		{
 			float force = 1.5f;
 
+			Count--;
 			var egg = new Egg(player, world);
 			egg.KnownPosition = (PlayerLocation) player.KnownPosition.Clone();
 			egg.KnownPosition.Y += 1.62f;
-			egg.Velocity = egg.KnownPosition.GetDirection().Normalize() * (force);
+			egg.Velocity = egg.KnownPosition.GetDirectionVector().Normalize() * (force);
 			egg.SpawnEntity();
 		}
 	}

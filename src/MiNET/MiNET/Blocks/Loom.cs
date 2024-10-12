@@ -33,7 +33,7 @@ namespace MiNET.Blocks
 {
 	public partial class Loom : Block
 	{
-		public Loom() : base(459)
+		public Loom() : base()
 		{
 			IsTransparent = true;
 			BlastResistance = 6000;
@@ -42,7 +42,7 @@ namespace MiNET.Blocks
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			Direction = player.GetOppositeDirection();
+			Direction = player.KnownPosition.GetDirection().Opposite();
 
 			return false;
 		}
@@ -51,7 +51,7 @@ namespace MiNET.Blocks
 		{
 			var containerOpen = McpeContainerOpen.CreateObject();
 			containerOpen.windowId = 24;
-			containerOpen.type = 24;
+			containerOpen.type = (sbyte) WindowType.Loom;
 			containerOpen.coordinates = blockCoordinates;
 			containerOpen.runtimeEntityId = EntityManager.EntityIdSelf;
 			player.SendPacket(containerOpen);

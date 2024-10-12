@@ -23,34 +23,19 @@
 
 #endregion
 
-using System.Numerics;
 using MiNET.BlockEntities;
-using MiNET.Items;
-using MiNET.Utils;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
 
 namespace MiNET.Blocks
 {
-	public abstract class BlastFurnaceBase : Block
+	public abstract class BlastFurnaceBase : FurnaceBase
 	{
-		protected BlastFurnaceBase(int id) : base(id)
+		protected BlastFurnaceBase()
 		{
 		}
 
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
+		protected override BlockEntity CreateBlockEntity()
 		{
-			var furnaceBlockEntity = new BlastFurnaceBlockEntity {Coordinates = Coordinates};
-			world.SetBlockEntity(furnaceBlockEntity);
-
-			return false;
-		}
-
-		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
-		{
-			player.OpenInventory(blockCoordinates);
-
-			return true;
+			return new BlastFurnaceBlockEntity { Coordinates = Coordinates };
 		}
 	}
 }

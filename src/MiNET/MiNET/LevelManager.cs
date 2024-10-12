@@ -30,6 +30,7 @@ using System.Threading.Tasks;
 using log4net;
 using MiNET.Utils;
 using MiNET.Worlds;
+using MiNET.Worlds.Anvil;
 
 namespace MiNET
 {
@@ -58,7 +59,7 @@ namespace MiNET
 
 				IWorldProvider worldProvider = null;
 
-				switch (Config.GetProperty("WorldProvider", "leveldb").ToLower().Trim())
+				switch (Config.GetProperty("WorldProvider", "anvil").ToLower().Trim())
 				{
 					case "leveldb":
 						worldProvider = new LevelDbProvider()
@@ -111,7 +112,6 @@ namespace MiNET
 					TntExplodes = Config.GetProperty("GameRule.TntExplodes", true),
 					SendCommandfeedback = Config.GetProperty("GameRule.SendCommandfeedback", true),
 					RandomTickSpeed = Config.GetProperty("GameRule.RandomTickSpeed", 3),
-					RedstoneEnabled = Config.GetProperty("RedstoneEnabled", true),
 				};
 				level.Initialize();
 
@@ -153,11 +153,11 @@ namespace MiNET
 			return level;
 		}
 
-		public static void RecalculateBlockLight(Level level, AnvilWorldProvider wp)
-		{
-			var sources = wp.LightSources.ToArray();
-			Parallel.ForEach(sources, block => { BlockLightCalculations.Calculate(level, block.Coordinates); });
-		}
+		//public static void RecalculateBlockLight(Level level, AnvilWorldProvider wp)
+		//{
+		//	var sources = wp.LightSources.ToArray();
+		//	Parallel.ForEach(sources, block => { BlockLightCalculations.Calculate(level, block.Coordinates); });
+		//}
 
 		public void RemoveLevel(Level level)
 		{

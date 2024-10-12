@@ -40,13 +40,13 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using fNbt;
-using fNbt.Tags;
+using Jose;
 using log4net;
-using MiNET.Blocks;
-using MiNET.Crafting;
 using MiNET.Entities;
+using MiNET.Inventory;
 using MiNET.Items;
 using MiNET.Net;
+using MiNET.Net.Crafting;
 using MiNET.Net.RakNet;
 using MiNET.Utils;
 using MiNET.Utils.Cryptography;
@@ -54,6 +54,8 @@ using MiNET.Utils.IO;
 using MiNET.Utils.Metadata;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
+using MiNET.Worlds.Anvil.Data;
+using Newtonsoft.Json;
 using Org.BouncyCastle.Crypto.Agreement;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Modes;
@@ -135,9 +137,13 @@ namespace MiNET.Client
 			var motdProvider = new MotdProvider();
 
 			Connection = new RakConnection(ClientEndpoint, greyListManager, motdProvider, _threadPool);
-			var handlerFactory = new BedrockClientMessageHandler(Session, MessageHandler ?? new DefaultMessageHandler(this));
-			handlerFactory.ConnectionAction = () => SendLogin(Username);
-			Connection.CustomMessageHandlerFactory = session => handlerFactory;
+			Connection.CustomMessageHandlerFactory = session => 
+			{
+				var handlerFactory = new BedrockClientMessageHandler(session, MessageHandler ?? new DefaultMessageHandler(this));
+				handlerFactory.ConnectionAction = () => SendLogin(Username);
+
+				return handlerFactory;
+			};
 
 			//TODO: This is bad design, need to refactor this later.
 			greyListManager.ConnectionInfo = Connection.ConnectionInfo;
@@ -156,6 +162,8 @@ namespace MiNET.Client
 
 		public void SendLogin(string username)
 		{
+			JWT.JsonMapper = new NewtonsoftMapper();
+
 			var clientKey = CryptoUtils.GenerateClientKey();
 			byte[] data = CryptoUtils.CompressJwtBytes(CryptoUtils.EncodeJwt(username, clientKey, IsEmulator), CryptoUtils.EncodeSkinJwt(clientKey, username), CompressionLevel.Fastest);
 
@@ -235,8 +243,6 @@ namespace MiNET.Client
 
 		public CommandPermission UserPermission { get; set; }
 
-		public PermissionLevel permissionLevel { get; set; }
-
 		public AutoResetEvent PlayerStatusChangedWaitHandle = new AutoResetEvent(false);
 
 		public bool HasSpawned { get; set; }
@@ -245,55 +251,55 @@ namespace MiNET.Client
 
 		public void SendCraftingEvent2()
 		{
-			var recipe = _recipeToSend;
+			//var recipe = _recipeToSend;
 
-			if (recipe != null)
-			{
-				Log.Error("Sending crafting event: " + recipe.Id);
+			//if (recipe != null)
+			//{
+			//	Log.Error("Sending crafting event: " + recipe.Id);
 
-				McpeCraftingEvent crafting = McpeCraftingEvent.CreateObject();
-				crafting.windowId = 0;
-				crafting.recipeType = 1;
-				crafting.recipeId = recipe.Id;
+			//	McpeCraftingEvent crafting = McpeCraftingEvent.CreateObject();
+			//	crafting.windowId = 0;
+			//	crafting.recipeType = 1;
+			//	crafting.recipeId = recipe.Id;
 
-				{
-					ItemStacks slotData = new ItemStacks();
-					for (uint i = 0; i < recipe.Input.Length; i++)
-					{
-						slotData.Add(recipe.Input[i]);
+			//	{
+			//		ItemStacks slotData = new ItemStacks();
+			//		for (uint i = 0; i < recipe.Input.Length; i++)
+			//		{
+			//			slotData.Add(GetItemFromIngredient(recipe.Input[i]));
 
-						McpeInventorySlot sendSlot = McpeInventorySlot.CreateObject();
-						sendSlot.inventoryId = 0;
-						sendSlot.slot = i;
-						sendSlot.item = recipe.Input[i];
-						SendPacket(sendSlot);
+			//			McpeInventorySlot sendSlot = McpeInventorySlot.CreateObject();
+			//			sendSlot.inventoryId = 0;
+			//			sendSlot.slot = i;
+			//			sendSlot.item = GetItemFromIngredient(recipe.Input[i]);
+			//			SendPacket(sendSlot);
 
-						//McpeContainerSetSlot setSlot = McpeContainerSetSlot.CreateObject();
-						//setSlot.item = recipe.Input[i];
-						//setSlot.windowId = 0;
-						//setSlot.slot = (short) (i);
-						//SendPackage(setSlot);
-						//Log.Error("Set set slot");
-					}
-					crafting.input = slotData;
+			//			//McpeContainerSetSlot setSlot = McpeContainerSetSlot.CreateObject();
+			//			//setSlot.item = recipe.Input[i];
+			//			//setSlot.windowId = 0;
+			//			//setSlot.slot = (short) (i);
+			//			//SendPackage(setSlot);
+			//			//Log.Error("Set set slot");
+			//		}
+			//		crafting.input = slotData;
 
-					{
-						McpeMobEquipment eq = McpeMobEquipment.CreateObject();
-						eq.runtimeEntityId = EntityId;
-						eq.slot = 9;
-						eq.selectedSlot = 0;
-						eq.item = recipe.Input[0];
-						SendPacket(eq);
-						Log.Error("Set eq slot");
-					}
-				}
-				{
-					ItemStacks slotData = new ItemStacks {recipe.Result.First()};
-					crafting.result = slotData;
-				}
+			//		{
+			//			McpeMobEquipment eq = McpeMobEquipment.CreateObject();
+			//			eq.runtimeEntityId = EntityId;
+			//			eq.slot = 9;
+			//			eq.selectedSlot = 0;
+			//			eq.item = GetItemFromIngredient(recipe.Input[0]);
+			//			SendPacket(eq);
+			//			Log.Error("Set eq slot");
+			//		}
+			//	}
+			//	{
+			//		ItemStacks slotData = new ItemStacks {recipe.Output.First()};
+			//		crafting.result = slotData;
+			//	}
 
-				SendPacket(crafting);
-			}
+			//	SendPacket(crafting);
+			//}
 
 
 			//{
@@ -313,63 +319,74 @@ namespace MiNET.Client
 			//}
 		}
 
+		private Item GetItemFromIngredient(RecipeIngredient recipeIngredient)
+		{
+			return recipeIngredient switch
+			{
+				RecipeItemIngredient itemIngredient => itemIngredient.Item,
+				RecipeAirIngredient => new ItemAir(),
+				RecipeTagIngredient tagIngredient => ItemFactory.GetItem(ItemFactory.ItemTags[tagIngredient.Tag].First(), count: tagIngredient.Count),
+				_ => throw new ArgumentException($"Unexpected recipe type [{recipeIngredient.GetType()}] ingredient: [{recipeIngredient}]")
+			};
+		}
+
 		public void SendCraftingEvent()
 		{
-			var recipe = _recipeToSend;
+			//var recipe = _recipeToSend;
 
-			if (recipe != null)
-			{
-				{
-					//McpeContainerSetSlot setSlot = McpeContainerSetSlot.CreateObject();
-					//setSlot.item = new ItemBlock(new Block(17), 0) {Count = 1};
-					//setSlot.windowId = 0;
-					//setSlot.slot = 0;
-					//SendPackage(setSlot);
-				}
-				{
-					McpeMobEquipment eq = McpeMobEquipment.CreateObject();
-					eq.runtimeEntityId = EntityId;
-					eq.slot = 9;
-					eq.selectedSlot = 0;
-					eq.item = new ItemBlock(new Block(17), 0) {Count = 1};
-					SendPacket(eq);
-				}
+			//if (recipe != null)
+			//{
+			//	{
+			//		//McpeContainerSetSlot setSlot = McpeContainerSetSlot.CreateObject();
+			//		//setSlot.item = new ItemBlock(new Block(17), 0) {Count = 1};
+			//		//setSlot.windowId = 0;
+			//		//setSlot.slot = 0;
+			//		//SendPackage(setSlot);
+			//	}
+			//	{
+			//		McpeMobEquipment eq = McpeMobEquipment.CreateObject();
+			//		eq.runtimeEntityId = EntityId;
+			//		eq.slot = 9;
+			//		eq.selectedSlot = 0;
+			//		eq.item = ItemFactory.GetItem<OakLog>();
+			//		SendPacket(eq);
+			//	}
 
-				Log.Error("Sending crafting event: " + recipe.Id);
+			//	Log.Error("Sending crafting event: " + recipe.Id);
 
-				McpeCraftingEvent crafting = McpeCraftingEvent.CreateObject();
-				crafting.windowId = 0;
-				crafting.recipeType = 1;
-				crafting.recipeId = recipe.Id;
+			//	McpeCraftingEvent crafting = McpeCraftingEvent.CreateObject();
+			//	crafting.windowId = 0;
+			//	crafting.recipeType = 1;
+			//	crafting.recipeId = recipe.Id;
 
-				{
-					ItemStacks slotData = new ItemStacks {new ItemBlock(new Block(17), 0) {Count = 1}};
-					crafting.input = slotData;
-				}
-				{
-					ItemStacks slotData = new ItemStacks {new ItemBlock(new Block(5), 0) {Count = 1}};
-					crafting.result = slotData;
-				}
+			//	{
+			//		ItemStacks slotData = new ItemStacks { ItemFactory.GetItem<OakLog>() };
+			//		crafting.input = slotData;
+			//	}
+			//	{
+			//		ItemStacks slotData = new ItemStacks { ItemFactory.GetItem<OakLog>() };
+			//		crafting.result = slotData;
+			//	}
 
-				SendPacket(crafting);
+			//	SendPacket(crafting);
 
-				//{
-				//	McpeContainerSetSlot setSlot = McpeContainerSetSlot.CreateObject();
-				//	setSlot.item = new MetadataSlot(new ItemStack(new ItemBlock(new Block(5), 0), 4));
-				//	setSlot.windowId = 0;
-				//	setSlot.slot = 0;
-				//	SendPackage(setSlot);
-				//}
+			//	//{
+			//	//	McpeContainerSetSlot setSlot = McpeContainerSetSlot.CreateObject();
+			//	//	setSlot.item = new MetadataSlot(new ItemStack(new ItemBlock(new Block(5), 0), 4));
+			//	//	setSlot.windowId = 0;
+			//	//	setSlot.slot = 0;
+			//	//	SendPackage(setSlot);
+			//	//}
 
-				{
-					McpeMobEquipment eq = McpeMobEquipment.CreateObject();
-					eq.runtimeEntityId = EntityId;
-					eq.slot = 10;
-					eq.selectedSlot = 1;
-					eq.item = new ItemBlock(new Block(5), 0) {Count = 1};
-					SendPacket(eq);
-				}
-			}
+			//	{
+			//		McpeMobEquipment eq = McpeMobEquipment.CreateObject();
+			//		eq.runtimeEntityId = EntityId;
+			//		eq.slot = 10;
+			//		eq.selectedSlot = 1;
+			//		eq.item = ItemFactory.GetItem<Planks>();
+			//		SendPacket(eq);
+			//	}
+			//}
 		}
 
 		private string SerializeCompound(NbtCompound compound)
@@ -532,71 +549,30 @@ namespace MiNET.Client
 		public void WriteInventoryToFile(string fileName, ItemStacks slots)
 		{
 			Log.Warn($"Writing inventory to filename: {fileName}");
-			FileStream file = File.OpenWrite(fileName);
+			var items = new List<ExternalDataItem>();
 
-			IndentedTextWriter writer = new IndentedTextWriter(new StreamWriter(file));
-
-			writer.WriteLine("// GENERATED CODE. DON'T EDIT BY HAND");
-			writer.Indent++;
-			writer.Indent++;
-			writer.WriteLine("public static List<Item> CreativeInventoryItems = new List<Item>()");
-			writer.WriteLine("{");
-			writer.Indent++;
-
-			int metaId = 0;
-			int idOffset = 0;
-
-			foreach (var entry in slots)
+			foreach (var item in slots)
 			{
-				var slot = entry;
-
-				NbtCompound extraData = slot.ExtraData;
-				
-				var serialized = SerializeCompound(extraData);
-				var items = InventoryUtils.CreativeInventoryItems;
-				foreach (Item item in items)
-				{
-					if (item.Id == slot.Id)
-					{
-						if (idOffset == slot.Id)
-						{
-							metaId++;
-						}
-						else
-						{
-							metaId = 0;
-						}
-						idOffset = slot.Id;
-						writer.WriteLine($"new Item({item.Id}, {metaId}, {item.Count}){{ RuntimeId={slot.RuntimeId}, NetworkId={slot.NetworkId}, ExtraData = {serialized} }}, ");
-						break;
-					}
-				}
+				items.Add(ToExternalData(item));
 			}
 
-			// Template
-			new ItemAir
+			File.WriteAllText(fileName, JsonConvert.SerializeObject(items, new JsonSerializerSettings()
 			{
-				ExtraData = new NbtCompound
-				{
-					new NbtList("ench")
-					{
-						new NbtCompound
-						{
-							new NbtShort("id", 0),
-							new NbtShort("lvl", 0)
-						}
-					}
-				}
+				Formatting = Formatting.Indented,
+				DefaultValueHandling = DefaultValueHandling.Ignore
+			}));
+		}
+
+		private ExternalDataItem ToExternalData(Item item)
+		{
+			return new ExternalDataItem()
+			{
+				Id = item.Id,
+				Metadata = item.Metadata,
+				ExtraData = item.ExtraData == null ? null : Convert.ToBase64String(Packet.GetNbtData(item.ExtraData, false)),
+				BlockStates = item is ItemBlock itemBlock && itemBlock.Block.States.Any() ? Convert.ToBase64String(Packet.GetNbtData(itemBlock.Block.StatesNbt, false)) : null,
+				Count = 1
 			};
-			//var compound = new NbtCompound(string.Empty) { new NbtList("ench", new NbtCompound()) {new NbtShort("id", 0),new NbtShort("lvl", 0),}, };
-
-			writer.Indent--;
-			writer.WriteLine("};");
-			writer.Indent--;
-			writer.Indent--;
-
-			writer.Flush();
-			file.Close();
 		}
 
 		public string MetadataToCode(MetadataDictionary metadata)
@@ -731,6 +707,8 @@ namespace MiNET.Client
 			result = result.Replace(@"[]", "s");
 			return result;
 		}
+
+		private int _numberOfChunks = 0;
 
 		public ConcurrentDictionary<ChunkCoordinates, ChunkColumn> Chunks { get; } = new ConcurrentDictionary<ChunkCoordinates, ChunkColumn>();
 		public IndentedTextWriter _mobWriter;

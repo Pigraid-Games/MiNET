@@ -27,21 +27,12 @@ using MiNET.Items;
 
 namespace MiNET.Blocks
 {
-	public partial class Stonebrick : Block
+	public partial class StoneBricks : Block
 	{
-		public Stonebrick() : base(98)
+		public StoneBricks() : base()
 		{
 			BlastResistance = 30;
 			Hardness = 1.5f;
-		}
-
-		public override Item GetSmelt()
-		{
-			if (StoneBrickType == "default")
-			{
-				return ItemFactory.GetItem(98, 2);
-			}
-			return null;
 		}
 	}
 }

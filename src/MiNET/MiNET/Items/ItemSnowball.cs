@@ -30,9 +30,9 @@ using MiNET.Worlds;
 
 namespace MiNET.Items
 {
-	public class ItemSnowball : Item
+	public partial class ItemSnowball
 	{
-		public ItemSnowball() : base("minecraft:snowball", 332)
+		public ItemSnowball() : base()
 		{
 			MaxStackSize = 16;
 		}
@@ -44,7 +44,7 @@ namespace MiNET.Items
 			var snowBall = new Snowball(player, world);
 			snowBall.KnownPosition = (PlayerLocation) player.KnownPosition.Clone();
 			snowBall.KnownPosition.Y += 1.62f;
-			snowBall.Velocity = snowBall.KnownPosition.GetDirection().Normalize() * force;
+			snowBall.Velocity = snowBall.KnownPosition.GetDirectionVector().Normalize() * force;
 			snowBall.SpawnEntity();
 		}
 	}

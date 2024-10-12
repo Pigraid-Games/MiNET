@@ -84,7 +84,7 @@ namespace MiNET.Net.RakNet
 			// Shortcut to reply fast, and no parsing
 			if (messageType == DefaultMessageIdTypes.ID_OPEN_CONNECTION_REQUEST_1)
 			{
-				if (!_greyListManager.AcceptConnection(senderEndpoint.Address))
+				if (!_greyListManager.AcceptConnection(senderEndpoint))
 				{
 					var noFree = NoFreeIncomingConnections.CreateObject();
 					var bytes = noFree.Encode();

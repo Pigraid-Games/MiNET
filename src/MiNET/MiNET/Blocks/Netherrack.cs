@@ -23,21 +23,14 @@
 
 #endregion
 
-using MiNET.Items;
-
 namespace MiNET.Blocks
 {
 	public partial class Netherrack : Block
 	{
-		public Netherrack() : base(87)
+		public Netherrack() : base()
 		{
 			BlastResistance = 2;
 			Hardness = 0.4f;
-		}
-
-		public override Item GetSmelt()
-		{
-			return new ItemNetherbrick();
 		}
 	}
 }

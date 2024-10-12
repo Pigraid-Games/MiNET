@@ -38,6 +38,7 @@ using MiNET.Net;
 using MiNET.Net.RakNet;
 using MiNET.Utils;
 using MiNET.Utils.Cryptography;
+using MiNET.Utils.IO;
 using MiNET.Utils.Skins;
 using Newtonsoft.Json.Linq;
 using Org.BouncyCastle.Crypto.Agreement;
@@ -62,9 +63,13 @@ namespace MiNET
 		private object _loginSyncLock = new object();
 		private PlayerInfo _playerInfo = new PlayerInfo();
 
-		public LoginMessageHandler(BedrockMessageHandler bedrockHandler, RakSession session, IServerManager serverManager)
+		static LoginMessageHandler()
 		{
 			JWT.DefaultSettings.JsonMapper = new NewtonsoftMapper();
+		}
+
+		public LoginMessageHandler(BedrockMessageHandler bedrockHandler, RakSession session, IServerManager serverManager)
+		{
 			_bedrockHandler = bedrockHandler;
 			_session = session;
 			_serverManager = serverManager;
@@ -76,26 +81,27 @@ namespace MiNET
 
 		public virtual void HandleMcpeRequestNetworkSettings(McpeRequestNetworkSettings message)
 		{
-			Log.Warn(message.protocolVersion);
-			//_playerInfo.ProtocolVersion = message.protocolVersion;
-			/*if (_playerInfo.ProtocolVersion < McpeProtocolInfo.ProtocolVersion || _playerInfo.ProtocolVersion > 65535)
+			_playerInfo.ProtocolVersion = message.protocolVersion;
+			if (_playerInfo.ProtocolVersion < McpeProtocolInfo.ProtocolVersion || _playerInfo.ProtocolVersion > 65535)
 			{
 				Log.Warn($"Wrong version ({_playerInfo.ProtocolVersion}) of Minecraft. Upgrade to join this server.");
 				_session.Disconnect($"Wrong version ({_playerInfo.ProtocolVersion}) of Minecraft. Upgrade to join this server.");
 				return;
-			}*/
+			}
+
+			var compressionAlgorithm = CompressionAlgorithm.ZLib;
 
 			McpeNetworkSettings settingsPacket = McpeNetworkSettings.CreateObject();
-			settingsPacket.compressionAlgorithm = 0;//zlib
-			settingsPacket.compressionThreshold = 1;
+			settingsPacket.compressionAlgorithm = (short) compressionAlgorithm;
+			settingsPacket.compressionThreshold = _session.CompressionManager.CompressionThreshold;
 			settingsPacket.clientThrottleEnabled = false;
 			settingsPacket.clientThrottleScalar = 0;
 			settingsPacket.clientThrottleThreshold = 0;
 			settingsPacket.ForceClear = true; // Must be!
 
 			_session.SendPrepareDirectPacket(settingsPacket);
-			Thread.Sleep(1000);
-			_session.EnableCompression = true;
+
+			_session.CompressionManager.CompressionAlgorithm = compressionAlgorithm;
 		}
 
 		public virtual void HandleMcpeLogin(McpeLogin message)
@@ -141,7 +147,8 @@ namespace MiNET
 			{
 				var destination = new MemoryStream(buffer);
 				destination.Position = 0;
-				NbtBinaryReader reader = new NbtBinaryReader(destination, false);
+				// TODO - WHY NOT VarInt?!?!?!?! 
+				NbtBinaryReader reader = new NbtBinaryReader(destination, NbtFlavor.BedrockNoVarInt);
 
 				var countCertData = reader.ReadInt32();
 				certificateChain = Encoding.UTF8.GetString(reader.ReadBytes(countCertData));
@@ -530,10 +537,10 @@ namespace MiNET
 			IMcpeMessageHandler messageHandler = server.CreatePlayer(_session, _playerInfo);
 			_bedrockHandler.Handler = messageHandler; // Replace current message handler with real one.
 
-			if (_playerInfo.ProtocolVersion != McpeProtocolInfo.ProtocolVersion)
+			if (_playerInfo.ProtocolVersion < McpeProtocolInfo.ProtocolVersion || _playerInfo.ProtocolVersion > 65535)
 			{
 				Log.Warn($"Wrong version ({_playerInfo.ProtocolVersion}) of Minecraft. Upgrade to join this server.");
-				_session.Disconnect($"Wrong version ({_playerInfo.ProtocolVersion}) of Minecraft. This server requires {McpeProtocolInfo.ProtocolVersion}");
+				_session.Disconnect($"Wrong version ({_playerInfo.ProtocolVersion}) of Minecraft. Upgrade to join this server.");
 				return;
 			}
 
@@ -595,11 +602,6 @@ namespace MiNET
 		}
 
 		public void HandleMcpePacketViolationWarning(McpePacketViolationWarning message)
-		{
-		}
-
-		/// <inheritdoc />
-		public void HandleMcpeFilterTextPacket(McpeFilterTextPacket message)
 		{
 		}
 
@@ -682,10 +684,6 @@ namespace MiNET
 		}
 
 		public void HandleMcpeInventorySlot(McpeInventorySlot message)
-		{
-		}
-
-		public void HandleMcpeCraftingEvent(McpeCraftingEvent message)
 		{
 		}
 
@@ -773,23 +771,27 @@ namespace MiNET
 		{
 		}
 
-		public void HandleMcpeEmote(McpeEmotePacket message)
+		public void HandleMcpePlayerToggleCrafterSlotRequest(McpePlayerToggleCrafterSlotRequest message)
 		{
 		}
 
-		public void HandleMcpeEmoteList(McpeEmoteList message)
+		public void HandleMcpeSetPlayerInventoryOptions(McpeSetPlayerInventoryOptions message)
 		{
 		}
 
-		public void HandleMcpePermissionRequest(McpePermissionRequest message)
+		public void HandleMcpeServerPlayerPostMovePosition(McpeServerPlayerPostMovePosition message)
 		{
 		}
 
-		public void HandleMcpeSetInventoryOptions(McpeSetInventoryOptions message)
+		public void HandleMcpeBossEvent(McpeBossEvent message)
 		{
 		}
 
-		public void HandleMcpeAnvilDamage(McpeAnvilDamage message)
+		public void HandleMcpeServerboundLoadingScreen(McpeServerboundLoadingScreen message)
+		{
+		}
+
+		public void HandleMcpeContainerRegistryCleanup(McpeContainerRegistryCleanup message)
 		{
 		}
 	}

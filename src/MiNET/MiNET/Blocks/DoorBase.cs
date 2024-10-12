@@ -24,8 +24,7 @@
 #endregion
 
 using System.Numerics;
-using log4net;
-using MiNET.Sounds;
+using MiNET.Blocks.States;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -33,14 +32,14 @@ namespace MiNET.Blocks
 {
 	public abstract class DoorBase : Block
 	{
-		private static readonly ILog Log = LogManager.GetLogger(typeof(DoorBase));
-		public static int fDirection { get; set; }
-		[StateRange(0, 3)] public virtual int Direction { get; set; }
-		[StateBit] public virtual bool DoorHingeBit { get; set; }
-		[StateBit] public virtual bool OpenBit { get; set; }
-		[StateBit] public virtual bool UpperBlockBit { get; set; }
+		public abstract OldDirection3 Direction { get; set; }
+		public abstract bool DoorHingeBit { get; set; }
+		public abstract bool OpenBit { get; set; }
+		public abstract bool UpperBlockBit { get; set; }
 
-		protected DoorBase(byte id) : base(id)
+		private BlockCoordinates SecondPartCoordinates => UpperBlockBit ? Coordinates.BlockDown() : Coordinates.BlockUp();
+
+		protected DoorBase() : base()
 		{
 			IsTransparent = true;
 			BlastResistance = 15;
@@ -49,53 +48,37 @@ namespace MiNET.Blocks
 
 		protected override bool CanPlace(Level world, Player player, BlockCoordinates blockCoordinates, BlockCoordinates targetCoordinates, BlockFace face)
 		{
-			if (fDirection == 1 || fDirection == 3)
-			{
-				fDirection = 0;
-				Direction = fDirection;
-				DoorBase block = this;
-				block.OpenBit = true;
-				world.SetBlock(block);
-			}
-			return world.GetBlock(blockCoordinates).IsReplaceable && world.GetBlock(blockCoordinates + Level.Up).IsReplaceable;
-		}
-
-		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
-		{
-			return false;
+			return world.GetBlock(blockCoordinates).IsReplaceable && world.GetBlock(blockCoordinates.BlockUp()).IsReplaceable;
 		}
 
 		public override void BreakBlock(Level level, BlockFace face, bool silent = false)
 		{
-			// Remove door
-			if (UpperBlockBit) // Is Upper?
-			{
-				level.SetAir(Coordinates + Level.Down);
-			}
-			else
-			{
-				level.SetAir(Coordinates + Level.Up);
-			}
+			var secondPart = level.GetBlock(SecondPartCoordinates);
 
-			base.BreakBlock(level, face, silent);
+			BreakBlockInternal(level, face, silent);
+			if (secondPart is DoorBase secondPartDoor)
+			{
+				secondPartDoor.BreakBlockInternal(level, face, silent);
+			}
 		}
 
 		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
 		{
-			var sound = new Sound((short)LevelEventType.SoundOpenDoor, blockCoordinates);
-			sound.Spawn(world);
-			Direction = fDirection;
 			DoorBase block = this;
-			// Remove door
-			if (UpperBlockBit) // Is Upper?
+			if (UpperBlockBit)
 			{
-				block = (DoorBase) world.GetBlock(GetNewCoordinatesFromFace(blockCoordinates, BlockFace.Down));
+				block = (DoorBase) world.GetBlock(SecondPartCoordinates);
 			}
 
 			block.OpenBit = !block.OpenBit;
 			world.SetBlock(block);
 
 			return true;
+		}
+
+		private void BreakBlockInternal(Level level, BlockFace face, bool silent = false)
+		{
+			base.BreakBlock(level, face, silent);
 		}
 	}
 }

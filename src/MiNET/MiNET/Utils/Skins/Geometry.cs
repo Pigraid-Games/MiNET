@@ -27,7 +27,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 
 namespace MiNET.Utils.Skins
@@ -43,18 +42,18 @@ namespace MiNET.Utils.Skins
 		public int TextureWidth { get; set; }
 
 		[JsonProperty(PropertyName = "visible_bounds_height")]
-		public float VisibleBoundsHeight { get; set; }
+		public int VisibleBoundsHeight { get; set; }
 
 		[JsonProperty(PropertyName = "visible_bounds_offset")]
-		public float[] VisibleBoundsOffset { get; set; }
+		public int[] VisibleBoundsOffset { get; set; }
 
 		[JsonProperty(PropertyName = "visible_bounds_width")]
-		public float VisibleBoundsWidth { get; set; }
+		public int VisibleBoundsWidth { get; set; }
 
 		public object Clone()
 		{
 			var clone = (Description) MemberwiseClone();
-			clone.VisibleBoundsOffset = VisibleBoundsOffset?.Clone() as float[];
+			clone.VisibleBoundsOffset = VisibleBoundsOffset?.Clone() as int[];
 			return clone;
 		}
 	}
@@ -133,7 +132,7 @@ namespace MiNET.Utils.Skins
 			{
 				if (bone.NeverRender) continue;
 				if (bone.Cubes == null || bone.Cubes.Count == 0) continue;
-				var realBoneName = Regex.Replace(bone.Name, "\\d+", ""); //Blockbench ad numbers to bones with same names so lets remove them
+
 				var cubes = bone.Cubes.ToArray();
 				bone.Cubes.Clear();
 				foreach (var cube in cubes)
@@ -167,7 +166,7 @@ namespace MiNET.Utils.Skins
 											Velocity = Vector3.Zero
 										};
 										{
-											bool isHead = realBoneName.Equals(BoneName.Head.ToString(), StringComparison.InvariantCultureIgnoreCase);// == BoneName.Head.ToString();
+											bool isHead = bone.Name.Equals(BoneName.Head.ToString(), StringComparison.InvariantCultureIgnoreCase);// == BoneName.Head.ToString();
 											if (packInBody)
 											{
 												if (keepHead && isHead)
@@ -215,7 +214,7 @@ namespace MiNET.Utils.Skins
 										Uv = bone.Mirror ? new[] {uvx - w, uvy--} : new[] {uvx + w, uvy--},
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
-									bool isHead = realBoneName == BoneName.Head.ToString();
+									bool isHead = bone.Name == BoneName.Head.ToString();
 									if (isHead || random.NextDouble() < CubeFilterFactor)
 									{
 										if (packInBody)
@@ -266,7 +265,7 @@ namespace MiNET.Utils.Skins
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = realBoneName == BoneName.Head.ToString();
+										bool isHead = bone.Name == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -311,7 +310,7 @@ namespace MiNET.Utils.Skins
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = realBoneName == BoneName.Head.ToString();
+										bool isHead = bone.Name == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -354,7 +353,7 @@ namespace MiNET.Utils.Skins
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = realBoneName == BoneName.Head.ToString();
+										bool isHead = bone.Name == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -400,7 +399,7 @@ namespace MiNET.Utils.Skins
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = realBoneName == BoneName.Head.ToString();
+										bool isHead = bone.Name == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -446,7 +445,7 @@ namespace MiNET.Utils.Skins
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = realBoneName == BoneName.Head.ToString();
+										bool isHead = bone.Name == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)

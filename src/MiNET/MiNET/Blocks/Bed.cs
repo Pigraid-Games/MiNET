@@ -27,20 +27,20 @@ using System;
 using System.Numerics;
 using log4net;
 using MiNET.BlockEntities;
-using MiNET.Entities;
 using MiNET.Items;
+using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
 namespace MiNET.Blocks
 {
-	public partial class Bed : Block
+	public partial class Bed
 	{
 		private static readonly ILog Log = LogManager.GetLogger(typeof(Bed));
 
-		public byte Color { get; set; }
+		public byte? Color { get; set; }
 
-		public Bed() : base(26)
+		public Bed() : base()
 		{
 			BlastResistance = 1;
 			Hardness = 0.2f;
@@ -48,48 +48,50 @@ namespace MiNET.Blocks
 			//IsFlammable = true; // It can catch fire from lava, but not other means.
 		}
 
-		public override Item[] GetDrops(Item tool)
+		public override Item GetItem(Level world, bool blockItem = false)
 		{
-			return new[] {ItemFactory.GetItem(355, Color)};
+			var item = base.GetItem(world, blockItem);
+
+			if (world.GetBlockEntity(Coordinates) is BedBlockEntity bedBlockEntity)
+			{
+				item.Metadata = Color ?? bedBlockEntity.Color;
+			}
+
+			return item;
 		}
 
 		protected override bool CanPlace(Level world, Player player, BlockCoordinates blockCoordinates, BlockCoordinates targetCoordinates, BlockFace face)
 		{
-			var itemInHand = player.Inventory.GetItemInHand();
-			Color = Convert.ToByte(itemInHand.Metadata);
-			Direction = player.GetDirectionEmum() switch
-			{
-				Entity.Direction.West => 0,
-				Entity.Direction.North => 1,
-				Entity.Direction.East => 2,
-				Entity.Direction.South => 3,
-				_ => throw new ArgumentOutOfRangeException()
-			};
+			Direction = player.KnownPosition.GetDirection().Opposite();
 
 			return world.GetBlock(blockCoordinates).IsReplaceable && world.GetBlock(GetOtherPart()).IsReplaceable;
 		}
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
+			var inHandItem = player.Inventory.GetItemInHand();
+			if (inHandItem is not ItemBed) return false;
+
 			HeadPieceBit = false;
+
 			world.SetBlockEntity(new BedBlockEntity
 			{
 				Coordinates = Coordinates,
-				Color = Color
+				Color = Color ?? (byte) inHandItem.Metadata
 			});
 
-			var otherCoord = GetOtherPart();
 			Bed blockOther = new Bed
 			{
-				Coordinates = otherCoord,
+				Coordinates = GetOtherPart(),
 				Direction = Direction,
 				HeadPieceBit = true,
 			};
+
 			world.SetBlock(blockOther);
 			world.SetBlockEntity(new BedBlockEntity
 			{
 				Coordinates = blockOther.Coordinates,
-				Color = Color
+				Color = Color ?? (byte) inHandItem.Metadata
 			});
 
 			return false;
@@ -97,35 +99,11 @@ namespace MiNET.Blocks
 
 		public override void BreakBlock(Level level, BlockFace face, bool silent = false)
 		{
-			if (level.GetBlockEntity(Coordinates) is BedBlockEntity blockEntiy)
-			{
-				Color = blockEntiy.Color;
-			}
-
 			base.BreakBlock(level, face, silent);
 
 			var other = GetOtherPart();
 			level.SetAir(other);
 			level.RemoveBlockEntity(other);
-		}
-
-		private BlockCoordinates GetOtherPart()
-		{
-			var direction = Direction switch
-			{
-				0 => Level.North,
-				1 => Level.East,
-				2 => Level.South,
-				3 => Level.West,
-				_ => throw new ArgumentOutOfRangeException()
-			};
-
-			if (!HeadPieceBit)
-			{
-				direction = direction * -1;
-			}
-
-			return Coordinates + direction;
 		}
 
 		public override bool Interact(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoord)
@@ -152,6 +130,27 @@ namespace MiNET.Blocks
 			other.OccupiedBit = isOccupied;
 			world.SetBlock(this);
 			world.SetBlock(other);
+
+			//if (isOccupied)
+			//{
+			//	OccupiedBit = false;
+			//	world.SetData(Coordinates, (byte) (Metadata | 0x04));
+			//	world.SetData(other.Coordinates, (byte) (other.Metadata | 0x04));
+			//}
+			//else
+			//{
+			//	world.SetData(Coordinates, (byte) (Metadata & ~0x04));
+			//	world.SetData(other.Coordinates, (byte) (other.Metadata & ~0x04));
+			//}
+		}
+
+		private BlockCoordinates GetOtherPart()
+		{
+			var face = (BlockFace) Direction;
+
+			if (HeadPieceBit) face = face.Opposite();
+
+			return GetNewCoordinatesFromFace(Coordinates, face);
 		}
 	}
 }

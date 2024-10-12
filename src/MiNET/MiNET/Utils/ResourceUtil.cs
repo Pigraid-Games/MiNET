@@ -24,6 +24,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using MiNET.Items;
 using Newtonsoft.Json;
 
 namespace MiNET.Utils
@@ -36,13 +37,13 @@ namespace MiNET.Utils
 				namespaceProvider = typeof(T);
 			
 			var assembly = Assembly.GetAssembly(namespaceProvider);
-			string ns = "MiNET.Resources";
+			string ns = namespaceProvider.Namespace;
 
 			if (!string.IsNullOrWhiteSpace(subFolder))
 			{
 				ns += $".{subFolder}";
 			}
-			using (var stream = assembly.GetManifestResourceStream(ns + $".{filename}"))
+			using (var stream = assembly.GetManifestResourceStream( ns + $".{filename}"))
 			using (var reader = new StreamReader(stream))
 			{
 				return JsonConvert.DeserializeObject<T>(reader.ReadToEnd());

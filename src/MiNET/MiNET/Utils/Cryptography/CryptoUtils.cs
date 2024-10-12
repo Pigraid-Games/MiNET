@@ -33,7 +33,6 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using JetBrains.Annotations;
 using Jose;
 using log4net;
 using MiNET.Net;
@@ -71,11 +70,11 @@ namespace MiNET.Utils.Cryptography
 			return Convert.ToBase64String(input);
 		}
 
-		public static byte[] ToDerEncoded([NotNull] this ECDiffieHellmanPublicKey key)
+		public static byte[] ToDerEncoded(this ECDiffieHellmanPublicKey key)
 		{
 			byte[] asn = new byte[24] {0x30, 0x76, 0x30, 0x10, 0x6, 0x7, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x2, 0x1, 0x6, 0x5, 0x2b, 0x81, 0x4, 0x0, 0x22, 0x3, 0x62, 0x0, 0x4};
 
-			return asn.Concat(key.ExportSubjectPublicKeyInfo().Skip(8)).ToArray();
+			return asn.Concat(key.ToByteArray().Skip(8)).ToArray();
 		}
 
 		//public static ECDiffieHellmanPublicKey FromDerEncoded(byte[] keyBytes)
@@ -155,7 +154,7 @@ namespace MiNET.Utils.Cryptography
 				Iat = iat,
 				ExtraData = new ExtraData
 				{
-					//Xuid = "",
+					Xuid = "",
 					DisplayName = username,
 					Identity = isEmulator ? Guid.NewGuid().ToString() : "85e4febd-3d33-4008-b044-1ad9fb85b26c",
 					TitleId = "89692877"
@@ -166,6 +165,16 @@ namespace MiNET.Utils.Cryptography
 				Nbf = iat,
 				RandomNonce = new Random().Next(),
 			};
+
+			//			string txt = $@"{{
+			//	""exp"": 1467508449,
+			//	""extraData"": {{
+			//		""displayName"": ""gurunxx"",
+			//		""identity"": ""4e0199c6-7cfd-3550-b676-74398e0a5f1a""
+			//	}},
+			//	""identityPublicKey"": ""{b64Key}"",
+			//	""nbf"": 1467508448
+			//}}";
 
 			string val = JWT.Encode(certificateData, signKey, JwsAlgorithm.ES384, new Dictionary<string, object> {{"x5u", b64Key}});
 
@@ -226,7 +235,7 @@ namespace MiNET.Utils.Cryptography
 	""SkinAnimationData"": """",
 	""SkinColor"": ""#0"",
 	""SkinData"": ""{skin64}"",
-	""SkinGeometryData"": ""bnVsbAo="",
+	""SkinGeometryData"": """",
 	""SkinId"": ""{skin.SkinId}"",
 	""SkinImageHeight"": {skin.Height},
 	""SkinImageWidth"": {skin.Width},

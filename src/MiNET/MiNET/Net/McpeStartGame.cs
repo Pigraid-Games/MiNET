@@ -1,24 +1,18 @@
 ﻿using System;
 using System.Numerics;
-using fNbt;
 using log4net;
 using MiNET.Utils;
 using MiNET.Utils.Nbt;
 
 namespace MiNET.Net
 {
-	public class SpawnSettings
+	public class SpawnSettings : IPacketDataObject
 	{
 		public short BiomeType { get; set; }
+
 		public string BiomeName { get; set; }
+
 		public int Dimension { get; set; }
-		
-		public void Read(Packet packet)
-		{
-			BiomeType = packet.ReadShort();
-			BiomeName = packet.ReadString();
-			Dimension = packet.ReadVarInt();
-		}
 
 		public void Write(Packet packet)
 		{
@@ -26,190 +20,245 @@ namespace MiNET.Net
 			packet.Write(BiomeName);
 			packet.WriteVarInt(Dimension);
 		}
+
+		public static SpawnSettings Read(Packet packet)
+		{
+			return new SpawnSettings()
+			{
+				BiomeType = packet.ReadShort(),
+				BiomeName = packet.ReadString(),
+				Dimension = packet.ReadVarInt()
+			};
+		}
 	}
 
-	public class LevelSettings
+	public class LevelSettings : IPacketDataObject
 	{
-		public long seed; // = null;
-		public SpawnSettings spawnSettings;
+		public long Seed { get; set; }
 
-		public int generator; // = null;
-		public int gamemode; // = null;
-		public bool hardcoreEnabled; // = null;
-		public int difficulty; // = null;
-		public int x; // = null;
-		public int y; // = null;
-		public int z; // = null;
-		public bool hasAchievementsDisabled; // = null;
-		public bool editorWorld;
-		public bool createdInEditorMode; // = null;
-		public bool exportedFromEditorMode; // = null;
-		public int time; // = null;
-		public int eduOffer; // = null;
-		public bool hasEduFeaturesEnabled; // = null;
-		public string eduProductUuid; // = null;
-		public float rainLevel; // = null;
-		public float lightningLevel; // = null;
-		public bool hasConfirmedPlatformLockedContent; // = null;
-		public bool isMultiplayer; // = null;
-		public bool broadcastToLan; // = null;
-		public int xboxLiveBroadcastMode; // = null;
-		public int platformBroadcastMode; // = null;
-		public bool enableCommands; // = null;
-		public bool isTexturepacksRequired; // = null;
-		public GameRules gamerules; // = null;
-		public Experiments experiments;
-		public bool bonusChest; // = null;
-		public bool mapEnabled; // = null;
-		public byte permissionLevel; // = null;
-		public int serverChunkTickRange; // = null;
-		public bool hasLockedBehaviorPack; // = null;
-		public bool hasLockedResourcePack; // = null;
-		public bool isFromLockedWorldTemplate; // = null;
-		public bool useMsaGamertagsOnly; // = null;
-		public bool isFromWorldTemplate; // = null;
-		public bool isWorldTemplateOptionLocked; // = null;
-		public bool onlySpawnV1Villagers; // = null;
-		public bool isDisablingPersonas; // = null;
-		public bool isDisablingCustomSkins; // = null;
-		public bool emoteChatMuted;  // = null;
-		public string gameVersion; // = null;
-		public int limitedWorldWidth; // = null;
-		public int limitedWorldLength; // = null;
-		public bool isNewNether; // = null;
-		public EducationUriResource eduSharedUriResource = null;
-		public bool experimentalGameplayOverride; // = null;
-		public byte chatRestrictionLevel; // = null;
-		public bool isDisablePlayerInteractions; // = null;
+		public SpawnSettings SpawnSettings { get; set; }
 
+		public int Generator { get; set; }
+
+		public int GameMode { get; set; }
+
+		public bool Hardcore { get; set; }
+
+		public int Difficulty { get; set; }
+
+		public int X { get; set; }
+
+		public int Y { get; set; }
+
+		public int Z { get; set; }
+
+		public bool HasAchievementsDisabled { get; set; }
+
+		public int EditorWorldType { get; set; }
+
+		public bool CreatedInEditorMode { get; set; }
+
+		public bool ExportedFromEditorMode { get; set; }
+
+		public int Time { get; set; }
+
+		public int EduOffer { get; set; }
+
+		public bool HasEduFeaturesEnabled { get; set; }
+
+		public string EduProductUuid { get; set; }
+
+		public float RainLevel { get; set; }
+
+		public float LightningLevel { get; set; }
+
+		public bool HasConfirmedPlatformLockedContent { get; set; }
+
+		public bool IsMultiplayer { get; set; }
+
+		public bool BroadcastToLan { get; set; }
+
+		public int XboxLiveBroadcastMode { get; set; }
+
+		public int PlatformBroadcastMode { get; set; }
+
+		public bool EnableCommands { get; set; }
+
+		public bool IsTexturepacksRequired { get; set; }
+
+		public GameRules GameRules { get; set; }
+
+		public Experiments Experiments { get; set; } = new Experiments();
+
+		public bool BonusChest { get; set; }
+
+		public bool MapEnabled { get; set; }
+
+		public byte PermissionLevel { get; set; }
+
+		public int ServerChunkTickRange { get; set; }
+
+		public bool HasLockedBehaviorPack { get; set; }
+
+		public bool HasLockedResourcePack { get; set; }
+
+		public bool IsFromLockedWorldTemplate { get; set; }
+
+		public bool UseMsaGamertagsOnly { get; set; }
+
+		public bool IsFromWorldTemplate { get; set; }
+
+		public bool IsWorldTemplateOptionLocked { get; set; }
+
+		public bool OnlySpawnV1Villagers { get; set; }
+
+		public bool IsDisablingPersonas { get; set; }
+
+		public bool IsDisablingCustomSkins { get; set; }
+
+		public bool EmoteChatMuted { get; set; }
+		
+		public string GameVersion { get; set; }
+
+		public int LimitedWorldWidth { get; set; }
+
+		public int LimitedWorldLength { get; set; }
+
+		public bool IsNewNether { get; set; }
+
+		public EducationUriResource EduSharedUriResource { get; set; }
+
+		public bool ExperimentalGameplayOverride { get; set; }
+
+		public byte ChatRestrictionLevel { get; set; }
+
+		public bool IsDisablePlayerInteractions { get; set; }
+
+		public string ServerIdentifier { get; set; }
+
+		public string WorldIdentifier { get; set; }
+
+		public string ScenarioIdentifier { get; set; }
 
 		public void Write(Packet packet)
 		{
-			packet.Write(seed);
+			packet.Write(Seed);
 
-			var s = spawnSettings ?? new SpawnSettings();
-			s.Write(packet);
+			packet.Write(SpawnSettings ?? new SpawnSettings());
 
-			packet.WriteSignedVarInt(generator);
-			packet.WriteSignedVarInt(gamemode);
-			packet.Write(false); //hardcore
-			packet.WriteSignedVarInt(difficulty);
+			packet.WriteSignedVarInt(Generator);
+			packet.WriteSignedVarInt(GameMode);
+			packet.Write(Hardcore);
+			packet.WriteSignedVarInt(Difficulty);
 
-			packet.WriteSignedVarInt(x);
-			packet.WriteVarInt(y);
-			packet.WriteSignedVarInt(z);
+			packet.WriteSignedVarInt(X);
+			packet.WriteVarInt(Y);
+			packet.WriteSignedVarInt(Z);
 
-			packet.Write(hasAchievementsDisabled);
-			packet.Write(editorWorld);
-			packet.Write(createdInEditorMode);
-			packet.Write(exportedFromEditorMode);
-			packet.WriteSignedVarInt(time);
-			packet.WriteSignedVarInt(eduOffer);
-			packet.Write(hasEduFeaturesEnabled);
-			packet.Write(eduProductUuid);
-			packet.Write(rainLevel);
-			packet.Write(lightningLevel);
-			packet.Write(hasConfirmedPlatformLockedContent);
-			packet.Write(isMultiplayer);
-			packet.Write(broadcastToLan);
-			packet.WriteVarInt(xboxLiveBroadcastMode);
-			packet.WriteVarInt(platformBroadcastMode);
-			packet.Write(enableCommands);
-			packet.Write(isTexturepacksRequired);
-			packet.Write(gamerules);
-			packet.Write(experiments);
-			packet.Write(false); //ExperimentsPreviouslyToggled
-			packet.Write(bonusChest);
-			packet.Write(mapEnabled);
-			packet.Write(permissionLevel);
-			packet.Write(serverChunkTickRange);
-			packet.Write(hasLockedBehaviorPack);
-			packet.Write(hasLockedResourcePack);
-			packet.Write(isFromLockedWorldTemplate);
-			packet.Write(useMsaGamertagsOnly);
-			packet.Write(isFromWorldTemplate);
-			packet.Write(isWorldTemplateOptionLocked);
-			packet.Write(onlySpawnV1Villagers);
-			packet.Write(isDisablingPersonas);
-			packet.Write(isDisablingCustomSkins);
-			packet.Write(emoteChatMuted);
-			packet.Write(gameVersion);
-			packet.Write(limitedWorldWidth);
-			packet.Write(limitedWorldLength);
-			packet.Write(isNewNether);
-			packet.Write(eduSharedUriResource ?? new EducationUriResource("", ""));
-			packet.Write(false);
-			packet.Write(chatRestrictionLevel);
-			packet.Write(isDisablePlayerInteractions);
+			packet.Write(HasAchievementsDisabled);
+			packet.WriteVarInt(EditorWorldType);
+			packet.Write(CreatedInEditorMode);
+			packet.Write(ExportedFromEditorMode);
+			packet.WriteSignedVarInt(Time);
+			packet.WriteSignedVarInt(EduOffer);
+			packet.Write(HasEduFeaturesEnabled);
+			packet.Write(EduProductUuid);
+			packet.Write(RainLevel);
+			packet.Write(LightningLevel);
+			packet.Write(HasConfirmedPlatformLockedContent);
+			packet.Write(IsMultiplayer);
+			packet.Write(BroadcastToLan);
+			packet.WriteVarInt(XboxLiveBroadcastMode);
+			packet.WriteVarInt(PlatformBroadcastMode);
+			packet.Write(EnableCommands);
+			packet.Write(IsTexturepacksRequired);
+			packet.Write(GameRules);
+			packet.Write(Experiments);
+			packet.Write(BonusChest);
+			packet.Write(MapEnabled);
+			packet.Write(PermissionLevel);
+			packet.Write(ServerChunkTickRange);
+			packet.Write(HasLockedBehaviorPack);
+			packet.Write(HasLockedResourcePack);
+			packet.Write(IsFromLockedWorldTemplate);
+			packet.Write(UseMsaGamertagsOnly);
+			packet.Write(IsFromWorldTemplate);
+			packet.Write(IsWorldTemplateOptionLocked);
+			packet.Write(OnlySpawnV1Villagers);
+			packet.Write(IsDisablingPersonas);
+			packet.Write(IsDisablingCustomSkins);
+			packet.Write(EmoteChatMuted);
+			packet.Write(GameVersion);
+			packet.Write(LimitedWorldWidth);
+			packet.Write(LimitedWorldLength);
+			packet.Write(IsNewNether);
+			packet.Write(EduSharedUriResource ?? new EducationUriResource("", ""));
+			packet.Write(ExperimentalGameplayOverride);
+			packet.Write(ChatRestrictionLevel);
+			packet.Write(IsDisablePlayerInteractions);
+			packet.Write(ServerIdentifier);
+			packet.Write(WorldIdentifier);
+			packet.Write(ScenarioIdentifier);
 		}
 
-		public void Read(Packet packet)
+		public static LevelSettings Read(Packet packet)
 		{
-			seed = packet.ReadLong();
-
-			spawnSettings = new SpawnSettings();
-			spawnSettings.Read(packet);
-
-			generator = packet.ReadSignedVarInt();
-			gamemode = packet.ReadSignedVarInt();
-			hardcoreEnabled = packet.ReadBool();
-			difficulty = packet.ReadSignedVarInt();
-
-			x = packet.ReadSignedVarInt();
-			y = packet.ReadVarInt();
-			z = packet.ReadSignedVarInt();
-
-			hasAchievementsDisabled = packet.ReadBool();
-			editorWorld = packet.ReadBool();
-			createdInEditorMode = packet.ReadBool();
-			exportedFromEditorMode= packet.ReadBool();
-			time = packet.ReadSignedVarInt();
-			eduOffer = packet.ReadSignedVarInt();
-			hasEduFeaturesEnabled = packet.ReadBool();
-			eduProductUuid = packet.ReadString();
-			rainLevel = packet.ReadFloat();
-			lightningLevel = packet.ReadFloat();
-			hasConfirmedPlatformLockedContent = packet.ReadBool();
-			isMultiplayer = packet.ReadBool();
-			broadcastToLan = packet.ReadBool();
-			xboxLiveBroadcastMode = packet.ReadVarInt();
-			platformBroadcastMode = packet.ReadVarInt();
-			enableCommands = packet.ReadBool();
-			isTexturepacksRequired = packet.ReadBool();
-			gamerules = packet.ReadGameRules();
-			experiments = packet.ReadExperiments();
-			packet.ReadBool();
-			bonusChest = packet.ReadBool();
-			mapEnabled = packet.ReadBool();
-			permissionLevel = packet.ReadByte();
-			serverChunkTickRange = packet.ReadInt();
-			hasLockedBehaviorPack = packet.ReadBool();
-			hasLockedResourcePack = packet.ReadBool();
-			isFromLockedWorldTemplate = packet.ReadBool();
-			useMsaGamertagsOnly = packet.ReadBool();
-			isFromWorldTemplate = packet.ReadBool();
-			isWorldTemplateOptionLocked = packet.ReadBool();
-			onlySpawnV1Villagers = packet.ReadBool();
-			isDisablingPersonas = packet.ReadBool();
-			isDisablingCustomSkins = packet.ReadBool();
-			emoteChatMuted = packet.ReadBool();
-			gameVersion = packet.ReadString();
-
-			limitedWorldWidth = packet.ReadInt();
-			limitedWorldLength = packet.ReadInt();
-			isNewNether = packet.ReadBool();
-			eduSharedUriResource = packet.ReadEducationUriResource();
-
-			if (packet.ReadBool())
+			return new LevelSettings()
 			{
-				experimentalGameplayOverride = packet.ReadBool();
-			}
-			else
-			{
-				experimentalGameplayOverride = false;
-			}
-			chatRestrictionLevel = packet.ReadByte();
-			isDisablePlayerInteractions = packet.ReadBool();
+				Seed = packet.ReadLong(),
+				SpawnSettings = SpawnSettings.Read(packet),
+				Generator = packet.ReadSignedVarInt(),
+				GameMode = packet.ReadSignedVarInt(),
+				Hardcore = packet.ReadBool(),
+				Difficulty = packet.ReadSignedVarInt(),
+				X = packet.ReadSignedVarInt(),
+				Y = packet.ReadVarInt(),
+				Z = packet.ReadSignedVarInt(),
+				HasAchievementsDisabled = packet.ReadBool(),
+				EditorWorldType = packet.ReadVarInt(),
+				CreatedInEditorMode = packet.ReadBool(),
+				ExportedFromEditorMode = packet.ReadBool(),
+				Time = packet.ReadSignedVarInt(),
+				EduOffer = packet.ReadSignedVarInt(),
+				HasEduFeaturesEnabled = packet.ReadBool(),
+				EduProductUuid = packet.ReadString(),
+				RainLevel = packet.ReadFloat(),
+				LightningLevel = packet.ReadFloat(),
+				HasConfirmedPlatformLockedContent = packet.ReadBool(),
+				IsMultiplayer = packet.ReadBool(),
+				BroadcastToLan = packet.ReadBool(),
+				XboxLiveBroadcastMode = packet.ReadVarInt(),
+				PlatformBroadcastMode = packet.ReadVarInt(),
+				EnableCommands = packet.ReadBool(),
+				IsTexturepacksRequired = packet.ReadBool(),
+				GameRules = packet.ReadGameRules(),
+				Experiments = packet.ReadExperiments(),
+				BonusChest = packet.ReadBool(),
+				MapEnabled = packet.ReadBool(),
+				PermissionLevel = packet.ReadByte(),
+				ServerChunkTickRange = packet.ReadInt(),
+				HasLockedBehaviorPack = packet.ReadBool(),
+				HasLockedResourcePack = packet.ReadBool(),
+				IsFromLockedWorldTemplate = packet.ReadBool(),
+				UseMsaGamertagsOnly = packet.ReadBool(),
+				IsFromWorldTemplate = packet.ReadBool(),
+				IsWorldTemplateOptionLocked = packet.ReadBool(),
+				OnlySpawnV1Villagers = packet.ReadBool(),
+				IsDisablingPersonas = packet.ReadBool(),
+				IsDisablingCustomSkins = packet.ReadBool(),
+				EmoteChatMuted = packet.ReadBool(),
+				GameVersion = packet.ReadString(),
+				LimitedWorldWidth = packet.ReadInt(),
+				LimitedWorldLength = packet.ReadInt(),
+				IsNewNether = packet.ReadBool(),
+				EduSharedUriResource = packet.ReadEducationUriResource(),
+				ExperimentalGameplayOverride = packet.ReadBool() && packet.ReadBool(),
+				ChatRestrictionLevel = packet.ReadByte(),
+				IsDisablePlayerInteractions = packet.ReadBool(),
+				ServerIdentifier = packet.ReadString(),
+				WorldIdentifier = packet.ReadString(),
+				ScenarioIdentifier = packet.ReadString(),
+			};
 		}
 	}
 
@@ -222,9 +271,7 @@ namespace MiNET.Net
 		public int playerGamemode; // = null;
 		public Vector3 spawn; // = null;
 		public Vector2 rotation; // = null;
-		public string serverId; // = null;
-		public string worldId; // = null;
-		public string scenarioId; // = null;
+		
 		public string levelId; // = null;
 		public string worldName; // = null;
 		public string premiumWorldTemplateId; // = null;
@@ -236,14 +283,15 @@ namespace MiNET.Net
 		public int enchantmentSeed; // = null;
 		public BlockPalette blockPalette; // = null;
 		public ulong blockPaletteChecksum;
-		public Itemstates itemstates; // = null;
+		public ItemStates itemstates; // = null;
 		public string multiplayerCorrelationId; // = null;
 		public bool enableNewInventorySystem; // = null;
 		public string serverVersion; // = null;
-		public Nbt propertyData;
-		public UUID worldTemplateId;
-		public bool clientSideGenerationEnabled;
-		public bool blockNetworkIdsAreHashes = false;
+		public Nbt propertyData; // = null;
+		public UUID worldTemplateId; // = null;
+		public bool clientSideGenerationEnabled; // = null;
+		public bool blockNetworkIdsAreHashes; // = null;
+		public bool disableClientSounds; // = null;
 
 		public LevelSettings levelSettings = new LevelSettings();
 		
@@ -255,11 +303,9 @@ namespace MiNET.Net
 			Write(spawn);
 			Write(rotation);
 			
-			LevelSettings s = levelSettings ?? new LevelSettings();
-			s.Write(this);
-			Write(serverId);
-			Write(worldId);
-			Write(scenarioId);
+			var settings = levelSettings ?? new LevelSettings();
+			settings.Write(this);
+			
 			Write(levelId);
 			Write(worldName);
 			Write(premiumWorldTemplateId);
@@ -285,7 +331,7 @@ namespace MiNET.Net
 			Write(worldTemplateId);
 			Write(clientSideGenerationEnabled);
 			Write(blockNetworkIdsAreHashes);
-			Write(false);
+			Write(disableClientSounds);
 		}
 		
 		partial void AfterDecode()
@@ -296,13 +342,8 @@ namespace MiNET.Net
 			spawn = ReadVector3();
 			rotation = ReadVector2();
 
-			levelSettings = new LevelSettings();
-			levelSettings.Read(this);
-
-			serverId = ReadString();
-			worldId = ReadString();
-			scenarioId = ReadString();
-
+			levelSettings = LevelSettings.Read(this);
+			
 			levelId = ReadString();
 			worldName = ReadString();
 			premiumWorldTemplateId = ReadString();
@@ -326,7 +367,7 @@ namespace MiNET.Net
 				return;
 			}
 			
-			itemstates = ReadItemstates();
+			itemstates = ReadItemStates();
 			
 			multiplayerCorrelationId = ReadString();
 			enableNewInventorySystem = ReadBool();
@@ -336,7 +377,7 @@ namespace MiNET.Net
 			worldTemplateId = ReadUUID();
 			clientSideGenerationEnabled = ReadBool();
 			blockNetworkIdsAreHashes = ReadBool();
-			ReadBool();
+			disableClientSounds = ReadBool();
 		}
 
 		/// <inheritdoc />
@@ -348,9 +389,6 @@ namespace MiNET.Net
 			spawn=default(Vector3);
 			rotation=default(Vector2);
 			levelSettings = default;
-			serverId=default(string);
-			worldId=default(string);
-			scenarioId=default(string);
 			levelId=default(string);
 			worldName=default(string);
 			premiumWorldTemplateId=default(string);
@@ -361,14 +399,15 @@ namespace MiNET.Net
 			currentTick=default(long);
 			enchantmentSeed=default(int);
 			blockPalette=default(BlockPalette);
-			itemstates=default(Itemstates);
+			itemstates=default(ItemStates);
 			multiplayerCorrelationId=default(string);
 			enableNewInventorySystem=default(bool);
 			serverVersion=default(string);
-			propertyData = default;
-			worldTemplateId = default;
-			clientSideGenerationEnabled = default(bool);
-			blockNetworkIdsAreHashes =default(bool);
+			propertyData=default;
+			worldTemplateId=default;
+			clientSideGenerationEnabled=default(bool);
+			blockNetworkIdsAreHashes=default(bool);
+			disableClientSounds=default(bool);
 			base.Reset();
 		}
 	}

@@ -23,6 +23,7 @@
 
 #endregion
 
+using System;
 using System.Numerics;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
@@ -31,54 +32,53 @@ namespace MiNET.Blocks
 {
 	public partial class Torch : Block
 	{
-		public Torch() : base(50)
+		public Torch() : base()
 		{
 			IsTransparent = true;
 			IsSolid = false;
 			LightLevel = 14;
 		}
 
-		//protected override bool CanPlace(Level world, BlockCoordinates blockCoordinates, BlockFace face)
-		//{
-		//	Block block = world.GetBlockId(blockCoordinates);
-		//	if (block is Farmland
-		//	    || block is Ice
-		//		/*|| block is Glowstone || block is Leaves  */
-		//	    || block is Tnt
-		//	    || block is BlockStairs
-		//	    || block is StoneSlab
-		//	    || block is WoodSlab) return false;
-		//	Log.Debug("2");
+		public override void BlockUpdate(Level level, BlockCoordinates blockCoordinates)
+		{;
+			var face = (BlockFace) TorchFacingDirection;
+			if (face == BlockFace.Up) face = BlockFace.Down;
 
-		//	//TODO: More checks here, but PE blocks it pretty good right now
-		//	if (block is Glass && face == BlockFace.Up) return true;
-
-		//	Log.Debug($"3 {block.Id} {!block.IsTransparent}");
-
-		//	return !block.IsTransparent;
-		//}
+			if (level.GetBlock(Coordinates + face).IsTransparent)
+			{
+				level.BreakBlock(null, this);
+			}
+		}
 
 		public override bool PlaceBlock(Level world, Player player, BlockCoordinates blockCoordinates, BlockFace face, Vector3 faceCoords)
 		{
-			if (face == BlockFace.Down) return true;
+			return !(PlaceInternal(world, face.Opposite()) || CanPlace(world));
+		}
 
-			switch (face)
+		private bool PlaceInternal(Level world, BlockFace face)
+		{
+			if (face == BlockFace.Up) return false;
+
+			if (world.GetBlock(Coordinates + face).IsTransparent)
 			{
-				case BlockFace.Up:
-					TorchFacingDirection = "top";
-					break;
-				case BlockFace.North:
-					TorchFacingDirection = "south";
-					break;
-				case BlockFace.South:
-					TorchFacingDirection = "north";
-					break;
-				case BlockFace.West:
-					TorchFacingDirection = "east";
-					break;
-				case BlockFace.East:
-					TorchFacingDirection = "west";
-					break;
+				return false;
+			}
+
+			TorchFacingDirection = face;
+
+			return true;
+		}
+
+		private bool CanPlace(Level level)
+		{
+			if (PlaceInternal(level, BlockFace.Down)) return true;
+
+			foreach (var direction in Enum.GetValues<BlockFace>())
+			{
+				if (PlaceInternal(level, direction))
+				{
+					return true;
+				}
 			}
 
 			return false;

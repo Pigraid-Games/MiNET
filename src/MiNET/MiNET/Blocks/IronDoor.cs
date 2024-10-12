@@ -23,16 +23,15 @@
 
 #endregion
 
-using System.Numerics;
-using MiNET.Utils.Vectors;
-using MiNET.Worlds;
-
 namespace MiNET.Blocks
 {
-	public partial class IronDoor : DoorBase
+	public partial class IronDoor
 	{
-		public IronDoor() : base(71)
+		public IronDoor() : base()
 		{
+			IsTransparent = true;
+			BlastResistance = 25;
+			Hardness = 5;
 		}
 	}
 }
