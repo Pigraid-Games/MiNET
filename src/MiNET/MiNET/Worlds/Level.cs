@@ -814,48 +814,20 @@ namespace MiNET.Worlds
 					{
 						var knownPosition = (PlayerLocation) player.KnownPosition.Clone();
 
-						var move = McpeMovePlayer.CreateObject();
+						McpeMoveEntityDelta move = McpeMoveEntityDelta.CreateObject();
 						move.runtimeEntityId = player.EntityId;
-						move.x = knownPosition.X;
-						move.y = knownPosition.Y + 1.62f;
-						move.z = knownPosition.Z;
-						move.pitch = knownPosition.Pitch;
-						move.yaw = knownPosition.Yaw;
-						move.headYaw = knownPosition.HeadYaw;
-						move.mode = (byte) (player.Vehicle == 0 ? 0 : 3);
-						move.onGround = !player.IsGliding && player.IsOnGround;
-						move.otherRuntimeEntityId = player.Vehicle;
+						move.prevSentPosition = player.LastSentPosition;
+						move.currentPosition = new PlayerLocation(player.KnownPosition.X, player.KnownPosition.Y + 1.62f, player.KnownPosition.Z, player.KnownPosition.HeadYaw, player.KnownPosition.Yaw, player.KnownPosition.Pitch);
+						move.isOnGround = player.IsWalker && player.IsOnGround;
+						if (move.SetFlags())
+						{
+							RelayBroadcast(move);
+						}
 						movePackets.Add(move);
 						playerMoveCount++;
 					}
+					player.LastSentPosition = (PlayerLocation) player.KnownPosition.Clone();
 				}
-
-				//foreach (var entity in entities)
-				//{
-				//	if (entity.LastUpdatedTime >= lastSendTime)
-				//	{
-				//		{
-				//			McpeMoveEntity moveEntity = McpeMoveEntity.CreateObject();
-				//			moveEntity.entityId = entity.EntityId;
-				//			moveEntity.position = (PlayerLocation)entity.KnownPosition.Clone();
-				//			moveEntity.position.Y += entity.PositionOffset;
-				//			byte[] bytes = moveEntity.Encode();
-				//			BatchUtils.WriteLength(stream, bytes.Length);
-				//			stream.Write(bytes, 0, bytes.Length);
-				//			moveEntity.PutPool();
-				//		}
-				//		{
-				//			McpeSetEntityMotion entityMotion = McpeSetEntityMotion.CreateObject();
-				//			entityMotion.entityId = entity.EntityId;
-				//			entityMotion.velocity = entity.Velocity;
-				//			byte[] bytes = entityMotion.Encode();
-				//			BatchUtils.WriteLength(stream, bytes.Length);
-				//			stream.Write(bytes, 0, bytes.Length);
-				//			entityMotion.PutPool();
-				//		}
-				//		entiyMoveCount++;
-				//	}
-				//}
 
 				if (playerMoveCount == 0 && entiyMoveCount == 0) return;
 

@@ -50,6 +50,54 @@ namespace MiNET.Plugins.Commands
 		{
 		}
 
+		[Command(Name = "text")]
+		public void Text(Player commander, McpeText.ChatTypes type, string message)
+		{
+			McpeText text = McpeText.CreateObject();
+			text.type = (byte) type;
+			text.source = commander.Username;
+			text.message = message;
+
+			commander.SendPacket(text);
+		}
+
+		[Command(Name = "unlocked")]
+		public void Unlocked(Player commander)
+		{
+			McpeUnlockedRecipes request = McpeUnlockedRecipes.CreateObject();
+			request.Type = (int)McpeUnlockedRecipes.TYPE_NEWLY_UNLOCKED;
+			List<string> recipes = new();
+			recipes.Add("Test");
+			request.Recipes = recipes;
+			commander.SendPacket(request);
+		}
+
+		[Command(Name = "toast")]
+		public void Toast(Player commander)
+		{
+			McpeToastRequest request = McpeToastRequest.CreateObject();
+			request.Title = "Title test";
+			request.Body = "This is a body test";
+			commander.SendPacket(request);
+		}
+
+		[Command(Name = "stoast")]
+		public void SToast(Player commander, Target target, string title, string body)
+		{
+			McpeToastRequest request = McpeToastRequest.CreateObject();
+			request.Title = title;
+			request.Body = body;
+			if (target.Players != null)
+			{
+				List<string> names = new List<string>();
+				foreach (var p in target.Players)
+				{
+					names.Add(p.Username);
+					p.SendPacket(request);
+				}
+			}
+		}
+
 		[Command(Name = "op", Description = "Make player an operator")]
 		[Authorize(Permission = 4)]
 		public string MakeOperator(Player commander, Target target)

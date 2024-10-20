@@ -40,6 +40,7 @@ using MiNET.Utils.Metadata;
 using MiNET.Utils.Vectors;
 using MiNET.Utils.Nbt;
 using MiNET.Net.Crafting;
+using System.Collections.Generic;
 
 namespace MiNET.Net
 {
@@ -114,6 +115,8 @@ namespace MiNET.Net
 		void HandleMcpeSetPlayerInventoryOptions(McpeSetPlayerInventoryOptions message);
 		void HandleMcpeServerboundLoadingScreen(McpeServerboundLoadingScreen message);
 		void HandleMcpeContainerRegistryCleanup(McpeContainerRegistryCleanup message);
+		void HandleMcpeToastRequest(McpeToastRequest message);
+		void HandleMcpeUnlockedReceipes(McpeUnlockedRecipes message);
 	}
 
 	public interface IMcpeClientMessageHandler
@@ -1074,6 +1077,10 @@ namespace MiNET.Net
 						return McpeContainerRegistryCleanup.CreateObject().Decode(buffer);
 					case 0xe0:
 						return McpeAlexEntityAnimation.CreateObject().Decode(buffer);
+					case 0xba:
+						return McpeToastRequest.CreateObject().Decode(buffer);
+					case 0xc7:
+						return McpeUnlockedRecipes.CreateObject().Decode(buffer);
 				}
 			}
 
@@ -10015,6 +10022,108 @@ namespace MiNET.Net
 			offsets = default;
 		}
 
+	}
+
+	public partial class McpeUnlockedRecipes : Packet<McpeUnlockedRecipes>
+	{
+		public const uint TYPE_EMPTY = 0;
+		public const uint TYPE_INITIALLY_UNLOCKED = 1;
+		public const uint TYPE_NEWLY_UNLOCKED = 2;
+		public const uint TYPE_REMOVE = 3;
+		public const uint TYPE_REMOVE_ALL = 4;
+
+		public int Type { get; set; }
+		public List<string> Recipes { get; set; } = new List<string>();
+
+		public McpeUnlockedRecipes()
+		{
+			Id = 0xC7;
+			IsMcpe = true;
+		}
+
+		protected override void EncodePacket()
+		{
+			base.EncodePacket();
+			BeforeEncode();
+			
+			WriteVarLong(Type);
+			WriteUnsignedVarInt((uint)Recipes.Count);
+			foreach (var recipe in Recipes)
+			{
+				Write(recipe);
+			}
+
+			AfterEncode();
+		}
+
+		protected override void DecodePacket()
+		{
+			base.DecodePacket();
+			BeforeDecode();
+			AfterDecode();
+		}
+
+		protected override void ResetPacket()
+		{
+			base.ResetPacket();
+		}
+
+		partial void BeforeDecode();
+
+		partial void AfterDecode();
+
+		partial void BeforeEncode();
+
+		partial void AfterEncode();
+	}
+
+	public partial class McpeToastRequest : Packet<McpeToastRequest>
+	{
+		public string Title { get; set; }
+		public string Body { get; set; }
+
+		public McpeToastRequest()
+		{
+			Id = 0xBA;
+			IsMcpe = true;
+		}
+
+		protected override void EncodePacket()
+		{
+			base.EncodePacket();
+			BeforeEncode();
+			
+			Write(Title);
+			Write(Body);
+
+			AfterEncode();
+		}
+
+		protected override void DecodePacket()
+		{
+			base.DecodePacket();
+			BeforeDecode();
+			
+			Title = ReadString();
+			Body = ReadString();
+
+			AfterDecode();
+		}
+
+		protected override void ResetPacket()
+		{
+			base.ResetPacket();
+			Title = default;
+			Body = default;
+		}
+
+		partial void BeforeDecode();
+
+
+		partial void AfterDecode();
+		partial void BeforeEncode();
+
+		partial void AfterEncode();
 	}
 
 	public partial class McpeDimensionData : Packet<McpeDimensionData>

@@ -2207,7 +2207,7 @@ namespace MiNET
 		{
 			
 		}
-
+		
 		/// <inheritdoc />
 		public void HandleMcpeSubChunkRequestPacket(McpeSubChunkRequestPacket message)
 		{
@@ -3816,6 +3816,14 @@ namespace MiNET
 		public void HandleMcpeContainerRegistryCleanup(McpeContainerRegistryCleanup message)
 		{
 
+		}
+
+		public void HandleMcpeToastRequest(McpeToastRequest message)
+		{
+		}
+
+		public void HandleMcpeUnlockedReceipes(McpeUnlockedRecipes message)
+		{
 		}
 	}
 

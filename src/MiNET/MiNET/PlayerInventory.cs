@@ -30,6 +30,7 @@ using fNbt;
 using log4net;
 using MiNET.Blocks;
 using MiNET.Entities;
+using MiNET.Entities.World;
 using MiNET.Items;
 using MiNET.Net;
 using MiNET.Utils;
@@ -362,13 +363,28 @@ namespace MiNET
 		{
 			InHandSlot = selectedHotbarSlot;
 
+			if (GetItemInHand() is ItemMap)
+			{
+				long mapUuid = GetItemInHand().ExtraData.Get<NbtLong>("map_uuid").Value;
+				if (Player.Level.TryGetEntity(mapUuid, out MapEntity mapEntity))
+				{
+					var mapInfo = mapEntity.MapInfo;
+					mapInfo.UpdateType = 8;
+
+					var msg = McpeClientboundMapItemData.CreateObject();
+					msg.mapinfo = mapInfo;
+
+					Player.SendPacket(msg);
+				}
+			}
+
 			if (sendToPlayer)
 			{
 				var order = McpeMobEquipment.CreateObject();
 				order.runtimeEntityId = EntityManager.EntityIdSelf;
 				order.item = GetItemInHand();
 				order.selectedSlot = (byte) InHandSlot;
-				order.slot = (byte) (InHandSlot + HotbarSize);
+				order.slot = (byte) InHandSlot;
 				Player.SendPacket(order);
 			}
 
@@ -376,7 +392,7 @@ namespace MiNET
 			broadcast.runtimeEntityId = Player.EntityId;
 			broadcast.item = GetItemInHand();
 			broadcast.selectedSlot = (byte) InHandSlot;
-			broadcast.slot = (byte) (InHandSlot + HotbarSize);
+			broadcast.slot = (byte) InHandSlot;
 			Player.Level?.RelayBroadcast(Player, broadcast);
 		}
 

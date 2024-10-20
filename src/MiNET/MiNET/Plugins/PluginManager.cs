@@ -75,7 +75,7 @@ namespace MiNET.Plugins
 		internal void LoadPlugins()
 		{
 			if (Config.GetProperty("PluginDisabled", false)) return;
-
+			LoadCommands(new VanillaCommands());
 			// Default it is the directory we are executing, and below.
 			string pluginDirectoryPaths = Path.GetDirectoryName(new Uri(Assembly.GetEntryAssembly().Location).LocalPath);
 			pluginDirectoryPaths = Config.GetProperty("PluginDirectory", pluginDirectoryPaths);
