@@ -28,7 +28,7 @@ namespace MiNET.Worlds.Anvil.Data
 
 		public byte[] SkyLight { get; set; }
 
-		public void PopulateChunk(ChunkColumn chunkColumn)
+		public void PopulateChunk(ChunkColumn chunkColumn, int dataVersion)
 		{
 			// Y can be up to -4, but the array index starts from 0
 			var subChunkId = 4 + (sbyte) Y;
@@ -40,13 +40,13 @@ namespace MiNET.Worlds.Anvil.Data
 
 			var subChunk = (AnvilSubChunk) chunkColumn[subChunkId];
 
-			PopulateChunkBlockStates(chunkColumn, subChunk);
+			PopulateChunkBlockStates(chunkColumn, subChunk, dataVersion);
 			PopulateChunkBiomes(subChunk);
 			PopulateChunkBlockLigths(subChunk);
 			PopulateChunkSkyLigths(subChunk);
 		}
 
-		private void PopulateChunkBlockStates(ChunkColumn chunkColumn, AnvilSubChunk subChunk)
+		private void PopulateChunkBlockStates(ChunkColumn chunkColumn, AnvilSubChunk subChunk, int dataVersion)
 		{
 			var layer0 = subChunk.Layers[0];
 			var layer1 = subChunk.Layers[1];
@@ -58,13 +58,12 @@ namespace MiNET.Worlds.Anvil.Data
 
 			foreach (NbtCompound p in BlockStates.Palette)
 			{
-				//
-
-				var id = AnvilPaletteConverter.GetRuntimeIdByPalette(p, out var blockEntity);
+				AnvilToAnvilPaletteConverter.MapStates(p, dataVersion);
+				var id = AnvilToBedrockPaletteConverter.GetRuntimeIdByPalette(p, out var blockEntity);
 
 				waterloggedIds.Add(
 					p["Properties"]?["waterlogged"]?.StringValue == "true"
-					|| AnvilPaletteConverter.IsSeaBlock(BlockFactory.GetIdByRuntimeId(id))
+					|| AnvilToBedrockPaletteConverter.IsSeaBlock(BlockFactory.GetIdByRuntimeId(id))
 						? id : -1);
 
 				//snowyIds.Add(
@@ -140,7 +139,7 @@ namespace MiNET.Worlds.Anvil.Data
 
 		private void PopulateChunkBiomes(AnvilSubChunk subChunk)
 		{
-			var usingBiomes = Biomes.Palette.Select(AnvilPaletteConverter.GetBiomeByName).ToArray();
+			var usingBiomes = Biomes.Palette.Select(AnvilToBedrockPaletteConverter.GetBiomeByName).ToArray();
 
 			subChunk.Biomes.Clear();
 			subChunk.Biomes.AppendPaletteRange(usingBiomes.Select(biome => biome.Id));

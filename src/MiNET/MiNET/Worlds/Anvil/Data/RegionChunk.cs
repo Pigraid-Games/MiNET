@@ -59,7 +59,7 @@ namespace MiNET.Worlds.Anvil.Data
 
 			foreach (var section in Sections)
 			{
-				section.PopulateChunk(chunk);
+				section.PopulateChunk(chunk, DataVersion);
 			}
 		}
 

@@ -6,16 +6,17 @@ using log4net;
 using MiNET.BlockEntities;
 using MiNET.Blocks;
 using MiNET.Utils;
+using MiNET.Worlds.Anvil.Mapping;
 
 namespace MiNET.Worlds.Anvil
 {
-	public class AnvilPaletteConverter
+	public class AnvilToBedrockPaletteConverter
 	{
-		private static readonly ILog Log = LogManager.GetLogger(typeof(AnvilPaletteConverter));
+		private static readonly ILog Log = LogManager.GetLogger(typeof(AnvilToBedrockPaletteConverter));
 
 		private const string AnvilIncompatibleBitName = "anvil_incompatible_bit";
 
-		private static readonly AnvilToBedrockStateMapper _mapper = new AnvilToBedrockStateMapper();
+		private static readonly StateMapper _mapper = new StateMapper();
 
 		private static readonly Dictionary<string, string> _anvilBedrockBiomesMap = new Dictionary<string, string>
 		{
@@ -212,7 +213,7 @@ namespace MiNET.Worlds.Anvil
 			"torchflower"
 		};
 
-		static AnvilPaletteConverter()
+		static AnvilToBedrockPaletteConverter()
 		{
 			var poweredSkipMap = 
 				new SkipPropertyStateMapper("powered");
@@ -276,7 +277,7 @@ namespace MiNET.Worlds.Anvil
 				new PropertyValueStateMapper("single_wall", "side"),
 				new PropertyValueStateMapper("double_wall", "multiple"));
 			var faceAttachmentMap = attachmentMap.Clone();
-			faceAttachmentMap.AnvilName = "face";
+			faceAttachmentMap.OldName = "face";
 			var ageGrowthMap = new PropertyStateMapper("age",
 					(_, _, property) => new NbtString("growth", (int.Parse(property.Value) * 2 + 1).ToString()));
 
@@ -300,7 +301,7 @@ namespace MiNET.Worlds.Anvil
 			var litMap = new BlockStateMapper(
 				context =>
 				{
-					var litName = context.Properties["lit"].StringValue == "true" ? context.AnvilName.Replace("minecraft:", "minecraft:lit_") : context.AnvilName;
+					var litName = context.Properties["lit"].StringValue == "true" ? context.OldName.Replace("minecraft:", "minecraft:lit_") : context.OldName;
 					context.Properties.Remove("lit");
 
 					return litName;
@@ -509,7 +510,7 @@ namespace MiNET.Worlds.Anvil
 			_mapper.Add(new BlockStateMapper("minecraft:large_amethyst_bud", blockFaceMap));
 			_mapper.Add(new BlockStateMapper("minecraft:amethyst_cluster", blockFaceMap));
 
-			_mapper.Add(new BlockStateMapper("minecraft:ladder", oldFacingDirectionMap));
+			_mapper.Add(new BlockStateMapper("minecraft:ladder", oldFacingDirectionMap4));
 			_mapper.Add(new BlockStateMapper("minecraft:lightning_rod", oldFacingDirectionMap));
 			_mapper.Add(new BlockStateMapper("minecraft:dropper",
 				oldFacingDirectionMap, 
@@ -566,7 +567,7 @@ namespace MiNET.Worlds.Anvil
 				new BitPropertyStateMapper("open"));
 
 			var oakFenceGateMap = fenceGateMap.Clone();
-			oakFenceGateMap.BedrockName = "minecraft:fence_gate";
+			oakFenceGateMap.NewName = "minecraft:fence_gate";
 			_mapper.Add("minecraft:oak_fence_gate", oakFenceGateMap);
 
 			foreach (var wood in _woodList)
@@ -630,11 +631,11 @@ namespace MiNET.Worlds.Anvil
 
 				var banerMap = new BlockStateMapper(context =>
 				{
-					var name = context.AnvilName.Replace("minecraft:", "");
+					var name = context.OldName.Replace("minecraft:", "");
 
 					context.BlockEntityTemplate = blockEntity;
 
-					return context.AnvilName.Contains("_wall_banner") ? "minecraft:wall_banner" : "minecraft:standing_banner";
+					return context.OldName.Contains("_wall_banner") ? "minecraft:wall_banner" : "minecraft:standing_banner";
 				},
 					oldFacingDirectionMap,
 					new PropertyStateMapper("rotation", "ground_sign_direction"));
@@ -685,7 +686,7 @@ namespace MiNET.Worlds.Anvil
 			}
 
 			var floweredAzaleaLeavesMap = leavesMap.Clone();
-			floweredAzaleaLeavesMap.BedrockName = "minecraft:azalea_leaves_flowered";
+			floweredAzaleaLeavesMap.NewName = "minecraft:azalea_leaves_flowered";
 			_mapper.Add("minecraft:flowering_azalea_leaves", floweredAzaleaLeavesMap);
 
 			var saplingsMap = new BlockStateMapper(
@@ -705,7 +706,7 @@ namespace MiNET.Worlds.Anvil
 			var signMap = new BlockStateMapper(
 				context =>
 				{
-					var name = context.AnvilName.Replace("minecraft:", "");
+					var name = context.OldName.Replace("minecraft:", "");
 
 					name = name.Replace("dark_oak", "darkoak");
 
@@ -728,7 +729,7 @@ namespace MiNET.Worlds.Anvil
 			var hangingSignMap = new BlockStateMapper(
 				context =>
 				{
-					var name = context.AnvilName.Replace("minecraft:", "");
+					var name = context.OldName.Replace("minecraft:", "");
 					context.Properties.Add(new NbtString("hanging", "true"));
 
 					if (context.Properties["attached"].StringValue != "true")
@@ -755,7 +756,7 @@ namespace MiNET.Worlds.Anvil
 						}
 					}
 
-					return context.AnvilName;
+					return context.OldName;
 				},
 				oldFacingDirectionMap4,
 				new BitPropertyStateMapper("attached"),
@@ -783,7 +784,7 @@ namespace MiNET.Worlds.Anvil
 				new PropertyStateMapper("open", "open_bit"));
 
 			var oakTrapdoorMap = trapdoorMap.Clone();
-			oakTrapdoorMap.BedrockName = "minecraft:trapdoor";
+			oakTrapdoorMap.NewName = "minecraft:trapdoor";
 			_mapper.Add($"minecraft:oak_trapdoor", oakTrapdoorMap);
 			foreach (var material in _doorMaterialsList)
 			{
@@ -803,7 +804,7 @@ namespace MiNET.Worlds.Anvil
 					(name, properties, _) => new NbtString("door_hinge_bit", (int.Parse(properties["direction"]?.StringValue ?? doorFacingDirectionMap.Resolve(name, properties, properties["facing"] as NbtString).Value) % 2).ToString())));
 
 			var oakDoorMap = doorMap.Clone();
-			oakDoorMap.BedrockName = "minecraft:wooden_door";
+			oakDoorMap.NewName = "minecraft:wooden_door";
 			_mapper.Add($"minecraft:oak_door", oakDoorMap);
 			foreach (var material in _doorMaterialsList)
 			{
@@ -836,7 +837,7 @@ namespace MiNET.Worlds.Anvil
 			_mapper.TryAdd($"minecraft:stone_button", buttonMap);
 			_mapper.TryAdd($"minecraft:polished_blackstone_button", buttonMap);
 			var oakButtonMap = buttonMap.Clone();
-			oakButtonMap.BedrockName = "minecraft:wooden_button";
+			oakButtonMap.NewName = "minecraft:wooden_button";
 			_mapper.TryAdd($"minecraft:oak_button", oakButtonMap);
 			foreach (var wood in _woodList)
 				_mapper.TryAdd($"minecraft:{wood}_button", buttonMap);
@@ -848,16 +849,16 @@ namespace MiNET.Worlds.Anvil
 			var torchMap = new BlockStateMapper(
 				context =>
 				{
-					if (context.AnvilName.Contains("wall_"))
+					if (context.OldName.Contains("wall_"))
 					{
-						context.AnvilName = context.AnvilName.Replace("wall_", "");
+						context.OldName = context.OldName.Replace("wall_", "");
 					}
 					else
 					{
 						context.Properties["facing"] = new NbtString("facing", "top");
 					}
 
-					return context.Properties["lit"]?.StringValue == "false" ? $"minecraft:unlit_{context.AnvilName.Replace("minecraft:", "")}" : context.AnvilName;
+					return context.Properties["lit"]?.StringValue == "false" ? $"minecraft:unlit_{context.OldName.Replace("minecraft:", "")}" : context.OldName;
 				},
 				new PropertyStateMapper("facing", "torch_facing_direction",
 					new PropertyValueStateMapper("west", "east"),
@@ -883,7 +884,7 @@ namespace MiNET.Worlds.Anvil
 					new PropertyValueStateMapper("true", "1")));
 
 			var woodenPressurePlateMap = pressurePlateMap.Clone();
-			woodenPressurePlateMap.BedrockName = "minecraft:wooden_pressure_plate";
+			woodenPressurePlateMap.NewName = "minecraft:wooden_pressure_plate";
 
 			_mapper.Add($"minecraft:oak_pressure_plate", woodenPressurePlateMap);
 			_mapper.Add($"minecraft:stone_pressure_plate", pressurePlateMap);
@@ -919,7 +920,7 @@ namespace MiNET.Worlds.Anvil
 			var flowerPotMap = new BlockStateMapper(
 				context =>
 				{
-					var plantType = context.AnvilName.Replace("potted_", "")
+					var plantType = context.OldName.Replace("potted_", "")
 						.Replace("dead_bush", "deadbush")
 						.Replace("azalea_bush", "azalea");
 
@@ -953,7 +954,7 @@ namespace MiNET.Worlds.Anvil
 
 			var growthMap = new BlockStateMapper(
 				new PropertyStateMapper("age", "growth"));
-			var attachedGrowthMap = new BlockStateMapper(context => context.AnvilName.Replace("attached_", ""),
+			var attachedGrowthMap = new BlockStateMapper(context => context.OldName.Replace("attached_", ""),
 				oldFacingDirectionMap,
 				new AdditionalPropertyStateMapper("growth", "7"));
 
@@ -998,7 +999,7 @@ namespace MiNET.Worlds.Anvil
 			var mushroomBlockMap = new BlockStateMapper(
 				context =>
 				{
-					var nameOnly = context.AnvilName.Replace("minecraft:", "");
+					var nameOnly = context.OldName.Replace("minecraft:", "");
 					var down = context.Properties["down"].StringValue == "true" ? 1 : 0;
 					var up = context.Properties["up"].StringValue == "true" ? 1 : 0;
 					var south = context.Properties["south"].StringValue == "true" ? 1 : 0;
@@ -1041,7 +1042,7 @@ namespace MiNET.Worlds.Anvil
 						return "minecraft:brown_mushroom_block";
 					}
 
-					return context.AnvilName;
+					return context.OldName;
 				});
 
 			_mapper.Add("minecraft:brown_mushroom_block", mushroomBlockMap);
@@ -1135,12 +1136,12 @@ namespace MiNET.Worlds.Anvil
 			var skullMap = new BlockStateMapper(context =>
 			{
 				var rotation = byte.Parse(context.Properties["rotation"]?.StringValue ?? "0");
-				if (!context.AnvilName.Contains("_wall"))
+				if (!context.OldName.Contains("_wall"))
 				{
 					context.Properties["facing"] = new NbtString("facing", "up");
 				} 
 
-				var skullType = context.AnvilName.Replace("minecraft:", "").Replace("_head", "").Replace("_wall", "");
+				var skullType = context.OldName.Replace("minecraft:", "").Replace("_head", "").Replace("_wall", "");
 
 				var skullTypeBit = skullType switch
 				{
@@ -1229,7 +1230,7 @@ namespace MiNET.Worlds.Anvil
 
 					context.Properties.Add(new NbtString("books_stored", booksStored.ToString()));
 
-					return context.AnvilName;
+					return context.OldName;
 				},
 				directionMap));
 
@@ -1239,7 +1240,7 @@ namespace MiNET.Worlds.Anvil
 			_mapper.Add("minecraft:cave_vines", new BlockStateMapper(
 				context => context.Properties["berries"]?.StringValue == "true"
 					? "minecraft:cave_vines_head_with_berries"
-					: context.AnvilName,
+					: context.OldName,
 				new PropertyStateMapper("age", "growing_plant_age"),
 				new SkipPropertyStateMapper("berries")));
 
@@ -1277,7 +1278,7 @@ namespace MiNET.Worlds.Anvil
 
 					context.Properties.Add(new NbtString("vine_direction_bits", faceDirection.ToString()));
 
-					return context.AnvilName;
+					return context.OldName;
 				}));
 
 
@@ -1299,7 +1300,7 @@ namespace MiNET.Worlds.Anvil
 				context =>
 				{
 					var grassType = "default";
-					if (context.AnvilName == "minecraft:tall_seagrass")
+					if (context.OldName == "minecraft:tall_seagrass")
 						grassType = context.Properties["half"].StringValue == "upper" ? "double_top" : "double_bot";
 
 					context.Properties.Add(new NbtString("sea_grass_type", grassType));
@@ -1659,416 +1660,6 @@ namespace MiNET.Worlds.Anvil
 			}
 
 			return true;
-		}
-
-		public class AnvilToBedrockStateMapper
-		{
-			private readonly Dictionary<string, BlockStateMapper> _map = new Dictionary<string, BlockStateMapper>();
-			private readonly List<BlockStateMapper> _defaultMap = new List<BlockStateMapper>();
-
-			public void Add(BlockStateMapper map)
-			{
-				Add(map.AnvilName, map);
-			}
-
-			public void Add(string name, BlockStateMapper map)
-			{
-				_map.Add(name, map);
-			}
-
-			public bool TryAdd(BlockStateMapper map)
-			{
-				return TryAdd(map.AnvilName, map);
-			}
-
-			public bool TryAdd(string name, BlockStateMapper map)
-			{
-				return _map.TryAdd(name, map);
-			}
-
-			public void AddDefault(BlockStateMapper map)
-			{
-				_defaultMap.Add(map);
-			}
-
-			public string Resolve(BlockStateMapperContext context)
-			{
-				if (_map.TryGetValue(context.AnvilName, out var map))
-				{
-					context.AnvilName = map.Resolve(context);
-				}
-
-				foreach (var defMap in _defaultMap)
-				{
-					defMap.ResolveDefault(context);
-				}
-
-				return context.AnvilName;
-			}
-		}
-
-		public class BlockStateMapperContext
-		{
-			public string AnvilName { get; set; }
-			public string BedrockName { get; set; }
-			public NbtCompound Properties { get; set; }
-			public BlockEntity BlockEntityTemplate { get; set; }
-
-			public BlockStateMapperContext(string anvilName, NbtCompound properties)
-			{
-				AnvilName = anvilName;
-				Properties = properties;
-			}
-		}
-
-		public class BlockStateMapper
-		{
-			public string AnvilName { get; set; }
-			public string BedrockName { get; set; }
-
-			public Dictionary<string, PropertyStateMapper> PropertiesMap { get; } = new Dictionary<string, PropertyStateMapper>();
-			public List<AdditionalPropertyStateMapper> AdditionalProperties { get; } = new List<AdditionalPropertyStateMapper>();
-			public Dictionary<string, SkipPropertyStateMapper> SkipProperties { get; } = new Dictionary<string, SkipPropertyStateMapper>();
-
-			private readonly Func<BlockStateMapperContext, string> _func;
-
-			public BlockStateMapper(Func<BlockStateMapperContext, string> func)
-			{
-				_func = func;
-			}
-
-			public BlockStateMapper(Action<BlockStateMapperContext> func, params IPropertyStateMapper[] propertiesMap)
-				: this(null, null, func, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(Func<BlockStateMapperContext, string> func, params IPropertyStateMapper[] propertiesMap)
-				: this(null, null, func, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, Action<BlockStateMapperContext> func)
-				: this(anvilName, anvilName, func)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, Func<BlockStateMapperContext, string> func)
-				: this(anvilName, anvilName, func)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, Action<BlockStateMapperContext> func, params IPropertyStateMapper[] propertiesMap)
-				: this(anvilName, anvilName, func, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, Func<BlockStateMapperContext, string> func, params IPropertyStateMapper[] propertiesMap)
-				: this(anvilName, anvilName, func, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(params IPropertyStateMapper[] propertiesMap)
-				: this(anvilName: null, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, params IPropertyStateMapper[] propertiesMap)
-				: this(anvilName, anvilName, null, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, string bedrockName, params IPropertyStateMapper[] propertiesMap)
-				: this(anvilName, bedrockName, null, propertiesMap)
-			{
-
-			}
-
-			public BlockStateMapper(string anvilName, string bedrockName, Action<BlockStateMapperContext> func, params IPropertyStateMapper[] propertiesMap)
-				: this(anvilName, bedrockName, context =>
-				{
-					func(context);
-					return context.AnvilName;
-				}, propertiesMap)
-			{
-			}
-
-			public BlockStateMapper(string anvilName, string bedrockName, Func<BlockStateMapperContext, string> func, params IPropertyStateMapper[] propertiesMap)
-			{
-				AnvilName = anvilName;
-				BedrockName = bedrockName;
-
-				_func = func;
-
-				foreach (var map in propertiesMap)
-				{
-					if (map is PropertyStateMapper propertyStateMapper)
-					{
-						PropertiesMap.Add(propertyStateMapper.AnvilName ?? propertyStateMapper.GetHashCode().ToString(), propertyStateMapper);
-					}
-					else if (map is AdditionalPropertyStateMapper additionalPropertyStateMapper)
-					{
-						AdditionalProperties.Add(additionalPropertyStateMapper);
-					}
-					else if (map is SkipPropertyStateMapper skipPropertyStateMapper)
-					{
-						SkipProperties.Add(skipPropertyStateMapper.Name ?? skipPropertyStateMapper.GetHashCode().ToString(), skipPropertyStateMapper);
-					}
-				}
-			}
-
-			public string Resolve(BlockStateMapperContext context)
-			{
-				if (_func != null) context.AnvilName = _func(context);
-
-				foreach (NbtString prop in context.Properties.ToArray())
-				{
-					if (SkipProperties.TryGetValue(prop.Name, out var skipMap) && skipMap.Resolve(context.AnvilName, context.Properties, prop))
-					{
-						context.Properties.Remove(prop.Name);
-					}
-					else if (PropertiesMap.TryGetValue(prop.Name, out var propMap))
-					{
-						context.Properties.Remove(prop.Name);
-						context.Properties.Add(propMap.Resolve(context.AnvilName, context.Properties, prop));
-					}
-				}
-
-				foreach (var prop in AdditionalProperties)
-				{
-					context.Properties[prop.Name] = prop.Resolve(context.AnvilName, context.Properties);
-				}
-
-				return BedrockName ?? context.AnvilName;
-			}
-
-			public string ResolveDefault(BlockStateMapperContext context)
-			{
-				if (_func != null) return _func(context);
-
-				foreach (NbtString prop in context.Properties.ToArray())
-				{
-					var skipMap = SkipProperties.Values.FirstOrDefault(map => map.Name == prop.Name || map.Name == null);
-					if (skipMap != null && skipMap.Resolve(context.AnvilName, context.Properties, prop))
-					{
-						context.Properties.Remove(prop.Name);
-					}
-					else
-					{
-						var propMap = PropertiesMap.Values.FirstOrDefault(map => map.AnvilName == prop.Name || map.AnvilName == null);
-
-						if (propMap != null)
-						{
-							context.Properties.Remove(prop.Name);
-							context.Properties.Add(propMap.Resolve(context.AnvilName, context.Properties, prop));
-						}
-					}
-				}
-
-				foreach (var prop in AdditionalProperties)
-				{
-					context.Properties[prop.Name] = prop.Resolve(context.AnvilName, context.Properties);
-				}
-
-				return BedrockName ?? context.AnvilName;
-			}
-
-			public BlockStateMapper Clone()
-			{
-				var propertiesMap = new List<IPropertyStateMapper>();
-
-				foreach (var property in PropertiesMap.Values)
-					propertiesMap.Add(property.Clone());
-
-				foreach (var property in AdditionalProperties)
-					propertiesMap.Add(property.Clone());
-
-				foreach (var property in SkipProperties.Values)
-					propertiesMap.Add(property.Clone());
-
-				return new BlockStateMapper(AnvilName, BedrockName, (Func<BlockStateMapperContext, string>) _func?.Clone(), propertiesMap.ToArray());
-			}
-		}
-
-		public interface IPropertyStateMapper { }
-
-		public class BitPropertyStateMapper : PropertyStateMapper
-		{
-			public BitPropertyStateMapper(string anvilName)
-				: base(anvilName, $"{anvilName}_bit",
-					  new PropertyValueStateMapper("false", "0"),
-					  new PropertyValueStateMapper("true", "1"))
-			{
-
-			}
-		}
-
-		public class PropertyStateMapper : IPropertyStateMapper
-		{
-			public string AnvilName { get; set; }
-			public string BedrockName { get; set; }
-
-			public Dictionary<string, PropertyValueStateMapper> ValuesMap { get; } = new Dictionary<string, PropertyValueStateMapper>();
-
-			private readonly Func<string, NbtCompound, NbtString, NbtString> _func;
-
-			public PropertyStateMapper(params PropertyValueStateMapper[] propertiesNameMap)
-				: this(anvilName: null, bedrockName: null, propertiesNameMap)
-			{
-
-			}
-
-			public PropertyStateMapper(Func<string, NbtCompound, NbtString, NbtString> func)
-				: this(anvilName: null, func)
-			{
-
-			}
-
-			public PropertyStateMapper(string anvilName, params PropertyValueStateMapper[] propertiesNameMap)
-				: this(anvilName, bedrockName: null, propertiesNameMap)
-			{
-
-			}
-
-			public PropertyStateMapper(string anvilName, string bedrockName, params PropertyValueStateMapper[] propertiesNameMap)
-			{
-				AnvilName = anvilName;
-				BedrockName = bedrockName;
-
-				foreach (var map in propertiesNameMap)
-					ValuesMap.Add(map.AnvilName, map);
-			}
-
-			public PropertyStateMapper(string anvilName, Func<string, NbtCompound, NbtString, NbtString> func, params PropertyValueStateMapper[] propertiesNameMap)
-			{
-				AnvilName = anvilName;
-				_func = func;
-
-				foreach (var map in propertiesNameMap)
-					ValuesMap.Add(map.AnvilName, map);
-			}
-
-			public NbtString Resolve(string anvilName, NbtCompound properties, NbtString property)
-			{
-				return _func?.Invoke(anvilName, properties, property)
-					?? new NbtString(BedrockName ?? property.Name, ValuesMap.GetValueOrDefault(property.StringValue)?.Resolve(anvilName, properties) ?? property.StringValue);
-			}
-
-			public PropertyStateMapper Clone()
-			{
-				return new PropertyStateMapper(
-					AnvilName,
-					(Func<string, NbtCompound, NbtString, NbtString>) _func?.Clone(),
-					ValuesMap.Values.Select(v => v.Clone()).ToArray())
-				{
-					BedrockName = BedrockName
-				};
-			}
-		}
-
-		public class AdditionalPropertyStateMapper : IPropertyStateMapper
-		{
-			public string Name { get; set; }
-			public string Value { get; set; }
-
-			private readonly Func<string, NbtCompound, string> _func;
-
-			public AdditionalPropertyStateMapper(string name, string value)
-			{
-				Name = name;
-				Value = value;
-			}
-
-			public AdditionalPropertyStateMapper(string name, Func<string, NbtCompound, string> func)
-			{
-				Name = name;
-				_func = func;
-			}
-
-			public NbtString Resolve(string anvilName, NbtCompound properties)
-			{
-				return new NbtString(Name, _func?.Invoke(anvilName, properties) ?? Value);
-			}
-
-			public AdditionalPropertyStateMapper Clone()
-			{
-				return new AdditionalPropertyStateMapper(
-					Name,
-					(Func<string, NbtCompound, string>) _func?.Clone())
-				{
-					Value = Value
-				};
-			}
-		}
-
-		public class SkipPropertyStateMapper : IPropertyStateMapper
-		{
-			public string Name { get; set; }
-
-			private readonly Func<string, NbtCompound, NbtString, bool> _func;
-
-			public SkipPropertyStateMapper(string name)
-			{
-				Name = name;
-			}
-
-			public SkipPropertyStateMapper(string name, Func<string, NbtCompound, NbtString, bool> func)
-			{
-				Name = name;
-				_func = func;
-			}
-
-			public bool Resolve(string anvilName, NbtCompound properties, NbtString value)
-			{
-				return _func?.Invoke(anvilName, properties, value) ?? true;
-			}
-
-			public SkipPropertyStateMapper Clone()
-			{
-				return new SkipPropertyStateMapper(Name, (Func<string, NbtCompound, NbtString, bool>) _func?.Clone());
-			}
-		}
-
-		public class PropertyValueStateMapper
-		{
-			public string AnvilName { get; set; }
-			public string BedrockName { get; set; }
-
-			private readonly Func<string, NbtCompound, string, string> _func;
-
-			public PropertyValueStateMapper(string anvilName, string bedrockName)
-			{
-				AnvilName = anvilName;
-				BedrockName = bedrockName;
-			}
-
-			public PropertyValueStateMapper(string anvilName, Func<string, NbtCompound, string, string> func)
-			{
-				AnvilName = anvilName;
-				_func = func;
-			}
-
-			public string Resolve(string anvilName, NbtCompound properties)
-			{
-				return _func?.Invoke(anvilName, properties, AnvilName) ?? BedrockName;
-			}
-
-			public PropertyValueStateMapper Clone()
-			{
-				return new PropertyValueStateMapper(
-					AnvilName,
-					(Func<string, NbtCompound, string, string>) _func?.Clone())
-				{
-					BedrockName = BedrockName
-				};
-			}
 		}
 	}
 }
