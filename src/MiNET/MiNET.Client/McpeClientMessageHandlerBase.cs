@@ -114,11 +114,11 @@ namespace MiNET.Client
 			//response.responseStatus = 3;
 			//SendPackage(response);
 
-			if (message.texturepacks.Count != 0)
+			if (message.resourcePacks.Count != 0)
 			{
 				var resourcePackIds = new ResourcePackIds();
 
-				foreach (ResourcePackInfo packInfo in message.texturepacks)
+				foreach (var packInfo in message.resourcePacks)
 				{
 					resourcePackIds.Add(packInfo.UUID);
 				}

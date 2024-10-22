@@ -1127,134 +1127,26 @@ namespace MiNET.Net
 			return CdnUrls.Read(this);
 		}
 
-		public TexturePackInfos ReadTexturePackInfos()
-		{
-			int count = _reader.ReadInt16(); // LE
-											 //int count = ReadVarInt(); // LE
-
-			var packInfos = new TexturePackInfos();
-			for (int i = 0; i < count; i++)
-			{
-				var info = new TexturePackInfo();
-				var id = ReadString();
-				var version = ReadString();
-				var size = ReadUlong();
-				var encryptionKey = ReadString();
-				var subpackName = ReadString();
-				var contentIdentity = ReadString();
-				var hasScripts = ReadBool();
-				var isAddon = ReadBool();
-				var rtxEnabled = ReadBool();
-
-				info.UUID = id;
-				info.Version = version;
-				info.Size = size;
-				info.HasScripts = hasScripts;
-				info.ContentKey = encryptionKey;
-				info.SubPackName = subpackName;
-				info.ContentIdentity = contentIdentity;
-				info.isAddon = isAddon;
-				info.RtxEnabled = rtxEnabled;
-
-				packInfos.Add(info);
-			}
-
-			return packInfos;
-		}
-
 		public void Write(ResourcePackInfos packInfos)
 		{
-			if (packInfos == null)
+			if (packInfos == null || packInfos.Count == 0)
 			{
-				_writer.Write((short) 0);
+				Write((short) 0); // LE
+				//WriteVarInt(0);
 				return;
 			}
 
-			_writer.Write((short) packInfos.Count); // LE
-													//WriteVarInt(packInfos.Count);
-			foreach (var info in packInfos)
-			{
-				Write(info.UUID);
-				Write(info.Version);
-				Write(info.Size);
-				Write(info.ContentKey);
-				Write(info.SubPackName);
-				Write(info.ContentIdentity);
-				Write(info.HasScripts);
-				Write(info.isAddon);
-			}
+			packInfos.Write(this);
 		}
 
 		public ResourcePackInfos ReadResourcePackInfos()
 		{
-			int count = _reader.ReadInt16(); // LE
-											 //int count = ReadVarInt(); // LE
-
-			var packInfos = new ResourcePackInfos();
-			for (int i = 0; i < count; i++)
-			{
-				var info = new ResourcePackInfo();
-
-				var id = ReadString();
-				var version = ReadString();
-				var size = ReadUlong();
-				var encryptionKey = ReadString();
-				var subpackName = ReadString();
-				var contentIdentity = ReadString();
-				var hasScripts = ReadBool();
-				var isAddon = ReadBool();
-
-				info.UUID = id;
-				info.Version = version;
-				info.Size = size;
-				info.ContentKey = encryptionKey;
-				info.SubPackName = subpackName;
-				info.ContentIdentity = contentIdentity;
-				info.HasScripts = hasScripts;
-				info.isAddon = isAddon;
-
-				packInfos.Add(info);
-			}
-
-			return packInfos;
-		}
-
-		public void Write(ResourcePackIdVersions packInfos)
-		{
-			if (packInfos == null || packInfos.Count == 0)
-			{
-				WriteUnsignedVarInt(0);
-				return;
-			}
-			WriteUnsignedVarInt((uint) packInfos.Count); // LE
-			foreach (var info in packInfos)
-			{
-				Write(info.Id);
-				Write(info.Version);
-				Write(info.SubPackName);
-			}
+			return ResourcePackInfos.Read(this);
 		}
 
 		public ResourcePackIdVersions ReadResourcePackIdVersions()
 		{
-			uint count = ReadUnsignedVarInt();
-
-			var packInfos = new ResourcePackIdVersions();
-			for (int i = 0; i < count; i++)
-			{
-				var id = ReadString();
-				var version = ReadString();
-				var subPackName = ReadString();
-				var info = new PackIdVersion
-				{
-					Id = id,
-					Version = version,
-					SubPackName = subPackName
-				};
-				packInfos.Add(info);
-			}
-
-			return packInfos;
+			return ResourcePackIdVersions.Read(this);
 		}
 
 		public void Write(ResourcePackIds ids)
@@ -1264,26 +1156,13 @@ namespace MiNET.Net
 				Write((short) 0);
 				return;
 			}
-			Write((short) ids.Count);
 
-			foreach (var id in ids)
-			{
-				Write(id);
-			}
+			ids.Write(this);
 		}
 
 		public ResourcePackIds ReadResourcePackIds()
 		{
-			int count = ReadShort();
-
-			var ids = new ResourcePackIds();
-			for (int i = 0; i < count; i++)
-			{
-				var id = ReadString();
-				ids.Add(id);
-			}
-
-			return ids;
+			return ResourcePackIds.Read(this);
 		}
 
 		public void Write(Skin skin)

@@ -2241,11 +2241,11 @@ namespace MiNET.Net
 	public partial class McpeResourcePacksInfo : Packet<McpeResourcePacksInfo>
 	{
 
-		public bool mustAccept; // = null;
-		public bool hasAddons; // = null;
-		public bool hasScripts; // = null;
-		public TexturePackInfos texturepacks; // = null;
-		public uint cndUrls; // = null;
+		public bool mustAccept;
+		public bool hasAddons;
+		public bool hasScripts;
+		public ResourcePackInfos resourcePacks;
+		public CdnUrls cdnUrls;
 
 		public McpeResourcePacksInfo()
 		{
@@ -2260,10 +2260,10 @@ namespace MiNET.Net
 			BeforeEncode();
 
 			Write(mustAccept);
-			Write(false); //addons that we don't and won't have
+			Write(hasAddons);
 			Write(hasScripts);
-			Write(texturepacks);
-			WriteUnsignedVarInt(cndUrls);
+			Write(resourcePacks);
+			Write(cdnUrls);
 
 			AfterEncode();
 		}
@@ -2280,8 +2280,8 @@ namespace MiNET.Net
 			mustAccept = ReadBool();
 			hasAddons = ReadBool();
 			hasScripts = ReadBool();
-			texturepacks = ReadTexturePackInfos();
-			cndUrls = ReadUnsignedVarInt();
+			resourcePacks = ReadResourcePackInfos();
+			cdnUrls = ReadCdnUrls();
 
 			AfterDecode();
 		}
@@ -2293,11 +2293,11 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			mustAccept = default(bool);
-			hasAddons = default(bool);
-			hasScripts = default(bool);
-			texturepacks = default(TexturePackInfos);
-			cndUrls = default(uint);
+			mustAccept = default;
+			hasAddons = default;
+			hasScripts = default;
+			resourcePacks = default;
+			cdnUrls = default;
 		}
 
 	}
@@ -2305,13 +2305,12 @@ namespace MiNET.Net
 	public partial class McpeResourcePackStack : Packet<McpeResourcePackStack>
 	{
 
-		public bool mustAccept; // = null;
-		public ResourcePackIdVersions behaviorpackidversions; // = null;
-		public ResourcePackIdVersions resourcepackidversions; // = null;
-		public string gameVersion; // = null;
-		public Experiments experiments; // = null;
-		public bool experimentsPreviouslyToggled; // = null;
-		public bool hasEditorPacks; // = null;
+		public bool mustAccept;
+		public ResourcePackIdVersions behaviorpackidversions;
+		public ResourcePackIdVersions resourcepackidversions;
+		public string gameVersion;
+		public Experiments experiments;
+		public bool useVanillaEditorPacks;
 
 		public McpeResourcePackStack()
 		{
@@ -2330,8 +2329,7 @@ namespace MiNET.Net
 			Write(resourcepackidversions);
 			Write(gameVersion);
 			Write(experiments);
-			Write(experimentsPreviouslyToggled);
-			Write(hasEditorPacks);
+			Write(useVanillaEditorPacks);
 
 			AfterEncode();
 		}
@@ -2350,8 +2348,7 @@ namespace MiNET.Net
 			resourcepackidversions = ReadResourcePackIdVersions();
 			gameVersion = ReadString();
 			experiments = ReadExperiments();
-			experimentsPreviouslyToggled = ReadBool();
-			hasEditorPacks = ReadBool();
+			useVanillaEditorPacks = ReadBool();
 
 			AfterDecode();
 		}
@@ -2363,13 +2360,12 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			mustAccept = default(bool);
-			behaviorpackidversions = default(ResourcePackIdVersions);
-			resourcepackidversions = default(ResourcePackIdVersions);
-			gameVersion = default(string);
-			experiments = default(Experiments);
-			experimentsPreviouslyToggled = default(bool);
-			hasEditorPacks = default(bool);
+			mustAccept = default;
+			behaviorpackidversions = default;
+			resourcepackidversions = default;
+			gameVersion = default;
+			experiments = default;
+			useVanillaEditorPacks = default;
 		}
 
 	}
@@ -2384,8 +2380,8 @@ namespace MiNET.Net
 			Completed = 4,
 		}
 
-		public byte responseStatus; // = null;
-		public ResourcePackIds resourcepackids; // = null;
+		public byte responseStatus;
+		public ResourcePackIds resourcepackids;
 
 		public McpeResourcePackClientResponse()
 		{
@@ -2427,8 +2423,8 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			responseStatus = default(byte);
-			resourcepackids = default(ResourcePackIds);
+			responseStatus = default;
+			resourcepackids = default;
 		}
 
 	}

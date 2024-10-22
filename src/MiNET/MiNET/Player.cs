@@ -29,7 +29,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Numerics;
@@ -57,7 +56,6 @@ using MiNET.Utils.Skins;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 using Newtonsoft.Json;
-using System.Security.Cryptography;
 
 namespace MiNET
 {
@@ -111,11 +109,6 @@ namespace MiNET
 		public Session Session { get; set; }
 
 		public DamageCalculator DamageCalculator { get; set; } = new DamageCalculator();
-
-		public TexturePackInfos PlayerPackData { get; set; } = new TexturePackInfos();
-		public ResourcePackInfos PlayerPackDataB { get; set; } = new ResourcePackInfos();
-		public Dictionary<string, PlayerPackMapData> PlayerPackMap = new Dictionary<string, PlayerPackMapData>();
-
 
 
 		public Player(MiNetServer server, IPEndPoint endPoint) : base(EntityType.None, null)
@@ -338,29 +331,17 @@ namespace MiNET
 
 		public virtual void HandleMcpeResourcePackClientResponse(McpeResourcePackClientResponse message)
 		{
-			if (Log.IsDebugEnabled)
-				Log.Debug($"Handled packet 0x{message.Id:X2}\n{Packet.HexDump(message.Bytes)}");
+			if (Log.IsDebugEnabled) Log.Debug($"Handled packet 0x{message.Id:X2}\n{Packet.HexDump(message.Bytes)}");
 
 			if (message.responseStatus == 2)
 			{
-				foreach (string packid in message.resourcepackids)
-				{
-					var uuid = packid.Substring(0, Math.Min(packid.Length, 36));
-					var content = File.ReadAllBytes(PlayerPackMap[uuid].pack);
-
-					SHA256 sha256 = SHA256.Create();
-					byte[] packHash = sha256.ComputeHash(content);
-
-					McpeResourcePackDataInfo dataInfo = McpeResourcePackDataInfo.CreateObject();
-					dataInfo.packageId = uuid;
-					dataInfo.maxChunkSize = 16384;
-					dataInfo.chunkCount = (uint) Math.Ceiling((double) content.Count() / 16384);
-					dataInfo.compressedPackageSize = (ulong) content.Count();
-					dataInfo.hash = packHash;
-					dataInfo.isPremium = false;
-					dataInfo.packType = (byte) PlayerPackMap[uuid].type;
-					SendPacket(dataInfo);
-				}
+				McpeResourcePackDataInfo dataInfo = McpeResourcePackDataInfo.CreateObject();
+				dataInfo.packageId = "5abdb963-4f3f-4d97-8482-88e2049ab149";
+				dataInfo.maxChunkSize = 1048576;
+				dataInfo.chunkCount = 1;
+				dataInfo.compressedPackageSize = 359901; // Lenght of data
+				dataInfo.hash = new byte[] {57, 38, 13, 50, 39, 63, 88, 63, 59, 27, 63, 63, 63, 63, 6, 63, 54, 7, 84, 63, 47, 91, 63, 120, 63, 120, 42, 5, 104, 2, 63, 18};
+				SendPacket(dataInfo);
 				return;
 			}
 			else if (message.responseStatus == 3)
@@ -381,9 +362,6 @@ namespace MiNET
 				{
 					MiNetServer.FastThreadPool.QueueUserWorkItem(() => { Start(null); });
 				}
-				PlayerPackData.Clear();
-				PlayerPackDataB.Clear();
-				PlayerPackMap.Clear();
 				return;
 			}
 		}
@@ -393,111 +371,18 @@ namespace MiNET
 			McpeResourcePacksInfo packInfo = McpeResourcePacksInfo.CreateObject();
 			if (_serverHaveResources)
 			{
-				var packInfos = new TexturePackInfos();
-				var packInfosB = new ResourcePackInfos();
-				var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
-				var directoryB = Config.GetProperty("BehaviorDirectory", "BehaviorPacks");
-				packInfo.mustAccept = Config.GetProperty("ForceResourcePacks", false);
-
-				if (Directory.Exists(directory))
+				packInfo.mustAccept = false;
+				packInfo.resourcePacks = new ResourcePackInfos
 				{
-					foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
+					new ResourcePackInfo()
 					{
-						var archive = ZipFile.OpenRead(zipPack);
-
-						/*
-						var packDir = archive.Entries[0].FullName.Substring(0, archive.Entries[0].FullName.IndexOf('/'));
-
-						if (packDir == null)
-						{
-							Disconnect($"Invalid resource pack {zipPack}. Wrong folder structure");
-							continue;
-						}
-
-						var entry = archive.GetEntry($"{packDir}/manifest.json");
-						*/
-
-						var entry = "";
-
-						for (byte i = 0; i < archive.Entries.Count; i++) //todo too time consuming. I think. For large packs...
-						{
-							if (archive.Entries[i].ToString() == "manifest.json")
-							{
-								entry = archive.Entries[i].ToString();
-							}
-						}
-
-						if (entry == "")
-						{
-							Disconnect($"Invalid resource pack {zipPack}. Unable to locate manifest.json");
-							continue;
-						}
-
-						bool encrypted = false;
-
-						if (File.Exists($"{zipPack}.key"))
-						{
-							encrypted = true;
-						}
-
-						using (var stream = archive.GetEntry(entry).Open())
-						using (var reader = new StreamReader(stream))
-						{
-							string jsonContent = reader.ReadToEnd();
-							ManifestStructure obj = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
-							packInfos.Add(new TexturePackInfo
-							{
-								UUID = obj.Header.Uuid,
-								Version = $"{obj.Header.Version[0]}.{obj.Header.Version[1]}.{obj.Header.Version[2]}",
-								Size = (ulong) File.ReadAllBytes(zipPack).Count(),
-								ContentKey = encrypted ? File.ReadAllText($"{zipPack}.key") : "",
-								ContentIdentity = obj.Header.Uuid
-							});
-							PlayerPackMap.Add(obj.Header.Uuid, new PlayerPackMapData { pack = zipPack, type = ResourcePackType.Resources });
-						}
-					}
-					PlayerPackData = packInfos;
-				}
-
-				if (Directory.Exists(directoryB))
-				{
-					foreach (var zipPack in Directory.GetFiles(directoryB, "*.zip"))
-					{
-						var archive = ZipFile.OpenRead(zipPack);
-						var entry = "";
-
-						for (byte i = 0; i < archive.Entries.Count; i++)
-						{
-							if (archive.Entries[i].ToString() == "manifest.json")
-							{
-								entry = archive.Entries[i].ToString();
-							}
-						}
-
-						if (entry == "")
-						{
-							Disconnect($"Invalid behaviour pack {zipPack}. Unable to locate manifest.json");
-							continue;
-						}
-
-						using (var stream = archive.GetEntry(entry).Open())
-						using (var reader = new StreamReader(stream))
-						{
-							string jsonContent = reader.ReadToEnd();
-							ManifestStructure obj = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
-							packInfosB.Add(new ResourcePackInfo
-							{
-								UUID = obj.Header.Uuid,
-								Version = $"{obj.Header.Version[0]}.{obj.Header.Version[1]}.{obj.Header.Version[2]}",
-								Size = (ulong) File.ReadAllBytes(zipPack).Count()
-							});
-							PlayerPackMap.Add(obj.Header.Uuid, new PlayerPackMapData { pack = zipPack, type = ResourcePackType.Behaviour });
-						}
-					}
-					PlayerPackDataB = packInfosB;
-				}
-				packInfo.texturepacks = packInfos;
+						UUID = "5abdb963-4f3f-4d97-8482-88e2049ab149",
+						Version = "0.0.1",
+						Size = 359901
+					},
+				};
 			}
+
 			SendPacket(packInfo);
 		}
 
@@ -505,21 +390,19 @@ namespace MiNET
 		{
 			McpeResourcePackStack packStack = McpeResourcePackStack.CreateObject();
 			packStack.gameVersion = McpeProtocolInfo.GameVersion;
-
+			packStack.experiments = new Experiments();
+			
 			if (_serverHaveResources)
 			{
-				var packVersions = new ResourcePackIdVersions();
-				var packVersionsB = new ResourcePackIdVersions();
-				foreach (var packData in PlayerPackData)
+				packStack.mustAccept = false;
+				packStack.resourcepackidversions = new ResourcePackIdVersions
 				{
-					packVersions.Add(new PackIdVersion { Id = packData.UUID, Version = packData.Version });
-				}
-				foreach (var packData in PlayerPackDataB)
-				{
-					packVersionsB.Add(new PackIdVersion { Id = packData.UUID, Version = packData.Version });
-				}
-				packStack.resourcepackidversions = packVersions;
-				packStack.behaviorpackidversions = packVersionsB;
+					new PackIdVersion()
+					{
+						Id = "5abdb963-4f3f-4d97-8482-88e2049ab149",
+						Version = "0.0.1"
+					},
+				};
 			}
 
 			SendPacket(packStack);
