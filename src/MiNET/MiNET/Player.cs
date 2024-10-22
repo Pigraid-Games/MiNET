@@ -29,6 +29,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Numerics;
@@ -369,40 +370,107 @@ namespace MiNET
 		public virtual void SendResourcePacksInfo()
 		{
 			McpeResourcePacksInfo packInfo = McpeResourcePacksInfo.CreateObject();
-			if (_serverHaveResources)
+
+			var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
+
+			// Dynamically load resource packs from the directory
+			if (Directory.Exists(directory))
 			{
-				packInfo.mustAccept = false;
-				packInfo.resourcePacks = new ResourcePackInfos
+				Log.Debug($"Loading resource packs from: {directory}");
+
+				var resourcePacks = new ResourcePackInfos();
+
+				foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
 				{
-					new ResourcePackInfo()
+					Log.Debug($"Processing resource pack: {zipPack}");
+
+					var archive = ZipFile.OpenRead(zipPack);
+					var manifestEntry = archive.Entries.FirstOrDefault(e => e.FullName == "manifest.json");
+
+					if (manifestEntry != null)
 					{
-						UUID = "5abdb963-4f3f-4d97-8482-88e2049ab149",
-						Version = "0.0.1",
-						Size = 359901
-					},
-				};
+						using (var stream = manifestEntry.Open())
+						using (var reader = new StreamReader(stream))
+						{
+							var jsonContent = reader.ReadToEnd();
+							var manifest = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
+
+							resourcePacks.Add(new ResourcePackInfo
+							{
+								UUID = manifest.Header.Uuid,
+								Version = $"{manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}",
+								Size = (ulong) new FileInfo(zipPack).Length
+							});
+
+							Log.Debug($"Added resource pack UUID: {manifest.Header.Uuid}, Version: {manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}");
+						}
+					}
+					else
+					{
+						Log.Error($"No manifest.json found in {zipPack}");
+					}
+				}
+
+				packInfo.resourcePacks = resourcePacks;
+			}
+			else
+			{
+				Log.Error($"Resource directory {directory} does not exist.");
 			}
 
 			SendPacket(packInfo);
 		}
+
 
 		public virtual void SendResourcePackStack()
 		{
 			McpeResourcePackStack packStack = McpeResourcePackStack.CreateObject();
 			packStack.gameVersion = McpeProtocolInfo.GameVersion;
 			packStack.experiments = new Experiments();
-			
-			if (_serverHaveResources)
+
+			var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
+
+			if (Directory.Exists(directory))
 			{
-				packStack.mustAccept = false;
-				packStack.resourcepackidversions = new ResourcePackIdVersions
+				Log.Debug($"Loading resource pack stack from: {directory}");
+
+				var resourcePackIdVersions = new ResourcePackIdVersions();
+
+				foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
 				{
-					new PackIdVersion()
+					Log.Debug($"Processing resource pack for stack: {zipPack}");
+
+					var archive = ZipFile.OpenRead(zipPack);
+					var manifestEntry = archive.Entries.FirstOrDefault(e => e.FullName == "manifest.json");
+
+					if (manifestEntry != null)
 					{
-						Id = "5abdb963-4f3f-4d97-8482-88e2049ab149",
-						Version = "0.0.1"
-					},
-				};
+						using (var stream = manifestEntry.Open())
+						using (var reader = new StreamReader(stream))
+						{
+							var jsonContent = reader.ReadToEnd();
+							var manifest = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
+
+							resourcePackIdVersions.Add(new PackIdVersion
+							{
+								Id = manifest.Header.Uuid,
+								Version = $"{manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}"
+							});
+
+							Log.Debug($"Added to resource pack stack UUID: {manifest.Header.Uuid}, Version: {manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}");
+						}
+					}
+					else
+					{
+						Log.Error($"No manifest.json found in {zipPack}");
+					}
+				}
+
+				packStack.resourcepackidversions = resourcePackIdVersions;
+			}
+			else
+			{
+				Log.Error($"Resource directory {directory} does not exist.");
 			}
 
 			SendPacket(packStack);
@@ -2879,7 +2947,7 @@ namespace MiNET
 			levelSettings.IsMultiplayer = true;
 			levelSettings.BroadcastToLan = true;
 			levelSettings.EnableCommands = EnableCommands;
-			levelSettings.IsTexturepacksRequired = false;
+			levelSettings.IsTexturepacksRequired = true;
 			levelSettings.GameRules = Level.GetGameRules();
 			levelSettings.BonusChest = false;
 			levelSettings.MapEnabled = false;

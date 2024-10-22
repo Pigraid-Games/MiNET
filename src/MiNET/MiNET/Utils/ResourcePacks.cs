@@ -268,4 +268,26 @@ namespace MiNET.Utils
 		Skins = 7,
 		WorldTemplate = 8
 	}
+
+	public class ManifestStructure
+	{
+		public ManifestHeader Header { get; set; }
+		public List<ManifestModule> Modules { get; set; }
+	}
+
+	public class ManifestHeader
+	{
+		public string Description { get; set; }
+		public string Name { get; set; }
+		public string Uuid { get; set; }
+		public List<int> Version { get; set; }  // Version is usually an array like [1, 0, 0]
+	}
+
+	public class ManifestModule
+	{
+		public string Description { get; set; }
+		public string Type { get; set; }
+		public string Uuid { get; set; }
+		public List<int> Version { get; set; }
+	}
 }

@@ -50,6 +50,13 @@ namespace MiNET.Plugins.Commands
 		{
 		}
 
+		[Command(Name = "title")]
+		public void Title(Player commander, string title, string message)
+		{
+			commander.SendTitle(title, TitleType.Title, 3, 3, 7);
+			commander.SendTitle(message, TitleType.SubTitle, 3, 3, 7);
+		}
+
 		[Command(Name = "text")]
 		public void Text(Player commander, McpeText.ChatTypes type, string message)
 		{
