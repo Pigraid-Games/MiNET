@@ -70,13 +70,13 @@ namespace MiNET.Client
 
 		public override void HandleMcpeResourcePacksInfo(McpeResourcePacksInfo message)
 		{
-			Log.Warn($"HEX: \n{Packet.HexDump(message.Bytes)}");
+			//Log.Warn($"HEX: \n{Packet.HexDump(message.Bytes)}");
 
 			var sb = new StringBuilder();
 			sb.AppendLine();
 
 			sb.AppendLine("Texture packs:");
-			foreach (var info in message.resourcePacks)
+			foreach (TexturePackInfo info in message.texturepacks)
 			{
 				sb.AppendLine($"ID={info.UUID}, Version={info.Version}, Unknown={info.Size}");
 			}

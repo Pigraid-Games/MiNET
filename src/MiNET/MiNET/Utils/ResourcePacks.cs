@@ -22,6 +22,7 @@
 #endregion
 
 using System.Collections.Generic;
+using System.Reflection;
 using MiNET.Net;
 
 namespace MiNET.Utils
@@ -100,6 +101,8 @@ namespace MiNET.Utils
 		/// RTXEnabled specifies if the texture pack uses the raytracing technology introduced in 1.16.200.
 		/// </summary>
 		public bool RtxEnabled { get; set; }
+
+		public bool isAddon { get; set; }
 
 		public void Write(Packet packet)
 		{
@@ -267,5 +270,40 @@ namespace MiNET.Utils
 		Resources = 6,
 		Skins = 7,
 		WorldTemplate = 8
+	}
+
+	public class PlayerPackMapData
+	{
+		public string pack { get; set; }
+		public ResourcePackType type { get; set; }
+	}
+	public class TexturePackInfo : ResourcePackInfo
+	{
+		/// <summary>
+		/// RTXEnabled specifies if the texture pack uses the raytracing technology introduced in 1.16.200.
+		/// </summary>
+		public bool RtxEnabled { get; set; }
+	}
+
+
+	public class TexturePackInfos : List<TexturePackInfo>
+	{
+
+	}
+
+	public class Header
+	{
+		public string Description { get; set; }
+		public string Name { get; set; }
+		public string Uuid { get; set; }
+		public List<int> Version { get; set; }
+		public List<int> MinEngineVersion { get; set; }
+	}
+
+	public class ManifestStructure
+	{
+		public int FormatVersion { get; set; }
+		public Header Header { get; set; }
+		public List<Module> Modules { get; set; }
 	}
 }
