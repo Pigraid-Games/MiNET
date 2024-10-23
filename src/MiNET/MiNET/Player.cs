@@ -372,8 +372,7 @@ namespace MiNET
 			McpeResourcePacksInfo packInfo = McpeResourcePacksInfo.CreateObject();
 
 			var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
-
-			// Dynamically load resource packs from the directory
+			
 			if (Directory.Exists(directory))
 			{
 				Log.Debug($"Loading resource packs from: {directory}");
