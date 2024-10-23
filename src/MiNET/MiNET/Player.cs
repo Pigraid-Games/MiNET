@@ -33,6 +33,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Numerics;
+using System.Security.Cryptography;
 using System.Threading;
 using fNbt;
 using log4net;
@@ -111,6 +112,10 @@ namespace MiNET
 
 		public DamageCalculator DamageCalculator { get; set; } = new DamageCalculator();
 
+		public ResourcePackInfos PlayerPackData { get; set; } = new ResourcePackInfos();
+		public ResourcePackInfos PlayerPackDataB { get; set; } = new ResourcePackInfos();
+		public Dictionary<string, PlayerPackMapData> PlayerPackMap = new Dictionary<string, PlayerPackMapData>();
+
 
 		public Player(MiNetServer server, IPEndPoint endPoint) : base(EntityType.None, null)
 		{
@@ -176,13 +181,24 @@ namespace MiNET
 			string result = JsonConvert.SerializeObject(message, jsonSerializerSettings);
 			Log.Debug($"{message.GetType().Name}\n{result}");
 
-			var content = File.ReadAllBytes(@"D:\Temp\ResourcePackChunkData_8f760cf7-2ca4-44ab-ab60-9be2469b9777.zip");
+			var content = File.ReadAllBytes(PlayerPackMap[message.packageId].pack);
+
 			McpeResourcePackChunkData chunkData = McpeResourcePackChunkData.CreateObject();
-			chunkData.packageId = "5abdb963-4f3f-4d97-8482-88e2049ab149";
-			chunkData.chunkIndex = 0; // Package index ?
-			chunkData.progress = 0; // Long, maybe timestamp?
-			chunkData.payload = content;
+			chunkData.packageId = message.packageId;
+			chunkData.chunkIndex = message.chunkIndex;
+			chunkData.progress = 16384 * message.chunkIndex;
+			chunkData.payload = GetChunk(content, (int) chunkData.chunkIndex, 16384);
+			Console.WriteLine("Sending McpeResourcePackChunkData");
 			SendPacket(chunkData);
+		}
+
+		public static byte[] GetChunk(byte[] content, int chunkIndex, int chunkSize)
+		{
+			int start = chunkIndex * chunkSize;
+			int length = Math.Min(chunkSize, content.Length - start);
+			byte[] chunk = new byte[length];
+			Array.Copy(content, start, chunk, 0, length);
+			return chunk;
 		}
 
 		public virtual void HandleMcpePurchaseReceipt(McpePurchaseReceipt message)
@@ -328,21 +344,35 @@ namespace MiNET
 			OnLocalPlayerIsInitialized(new PlayerEventArgs(this));
 		}
 
-		private bool _serverHaveResources = false;
+		private bool _serverHaveResources = true;
+
 
 		public virtual void HandleMcpeResourcePackClientResponse(McpeResourcePackClientResponse message)
 		{
-			if (Log.IsDebugEnabled) Log.Debug($"Handled packet 0x{message.Id:X2}\n{Packet.HexDump(message.Bytes)}");
+			if (Log.IsDebugEnabled)
+				Log.Debug($"Handled packet 0x{message.Id:X2}\n{Packet.HexDump(message.Bytes)}");
 
 			if (message.responseStatus == 2)
 			{
-				McpeResourcePackDataInfo dataInfo = McpeResourcePackDataInfo.CreateObject();
-				dataInfo.packageId = "5abdb963-4f3f-4d97-8482-88e2049ab149";
-				dataInfo.maxChunkSize = 1048576;
-				dataInfo.chunkCount = 1;
-				dataInfo.compressedPackageSize = 359901; // Lenght of data
-				dataInfo.hash = new byte[] {57, 38, 13, 50, 39, 63, 88, 63, 59, 27, 63, 63, 63, 63, 6, 63, 54, 7, 84, 63, 47, 91, 63, 120, 63, 120, 42, 5, 104, 2, 63, 18};
-				SendPacket(dataInfo);
+				foreach (string packid in message.resourcepackids)
+				{
+					var uuid = packid.Substring(0, Math.Min(packid.Length, 36));
+					var content = File.ReadAllBytes(PlayerPackMap[uuid].pack);
+
+					SHA256 sha256 = SHA256.Create();
+					byte[] packHash = sha256.ComputeHash(content);
+
+					McpeResourcePackDataInfo dataInfo = McpeResourcePackDataInfo.CreateObject();
+					dataInfo.packageId = uuid;
+					dataInfo.maxChunkSize = 16384;
+					dataInfo.chunkCount = (uint) Math.Ceiling((double) content.Count() / 16384);
+					dataInfo.compressedPackageSize = (ulong) content.Count();
+					dataInfo.hash = packHash;
+					dataInfo.isPremium = false;
+					dataInfo.packType = (byte) PlayerPackMap[uuid].type;
+					Console.WriteLine("Sending McpeResourcePackStack");
+					SendPacket(dataInfo);
+				}
 				return;
 			}
 			else if (message.responseStatus == 3)
@@ -363,6 +393,9 @@ namespace MiNET
 				{
 					MiNetServer.FastThreadPool.QueueUserWorkItem(() => { Start(null); });
 				}
+				PlayerPackData.Clear();
+				PlayerPackDataB.Clear();
+				PlayerPackMap.Clear();
 				return;
 			}
 		}
@@ -370,108 +403,79 @@ namespace MiNET
 		public virtual void SendResourcePacksInfo()
 		{
 			McpeResourcePacksInfo packInfo = McpeResourcePacksInfo.CreateObject();
-
-			var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
-			
-			if (Directory.Exists(directory))
+			if (_serverHaveResources)
 			{
-				Log.Debug($"Loading resource packs from: {directory}");
+				var packInfos = new ResourcePackInfos();
+				var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
+				packInfo.mustAccept = Config.GetProperty("ForceResourcePacks", true);
 
-				var resourcePacks = new ResourcePackInfos();
-
-				foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
+				if (Directory.Exists(directory))
 				{
-					Log.Debug($"Processing resource pack: {zipPack}");
-
-					var archive = ZipFile.OpenRead(zipPack);
-					var manifestEntry = archive.Entries.FirstOrDefault(e => e.FullName == "manifest.json");
-
-					if (manifestEntry != null)
+					foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
 					{
-						using (var stream = manifestEntry.Open())
+						var archive = ZipFile.OpenRead(zipPack);
+
+						var entry = "";
+
+						for (byte i = 0; i < archive.Entries.Count; i++) //todo too time consuming. I think. For large packs...
+						{
+							if (archive.Entries[i].ToString() == "manifest.json")
+							{
+								entry = archive.Entries[i].ToString();
+							}
+						}
+
+						if (entry == "")
+						{
+							Disconnect($"Invalid resource pack {zipPack}. Unable to locate manifest.json");
+							continue;
+						}
+
+						bool encrypted = false;
+
+						if (File.Exists($"{zipPack}.key"))
+						{
+							encrypted = true;
+						}
+
+						using (var stream = archive.GetEntry(entry).Open())
 						using (var reader = new StreamReader(stream))
 						{
-							var jsonContent = reader.ReadToEnd();
-							var manifest = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
-
-							resourcePacks.Add(new ResourcePackInfo
+							string jsonContent = reader.ReadToEnd();
+							ManifestStructure obj = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
+							packInfos.Add(new ResourcePackInfo
 							{
-								UUID = manifest.Header.Uuid,
-								Version = $"{manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}",
-								Size = (ulong) new FileInfo(zipPack).Length
+								UUID = obj.Header.Uuid,
+								Version = $"{obj.Header.Version[0]}.{obj.Header.Version[1]}.{obj.Header.Version[2]}",
+								Size = (ulong) File.ReadAllBytes(zipPack).Count(),
 							});
-
-							Log.Debug($"Added resource pack UUID: {manifest.Header.Uuid}, Version: {manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}");
+							PlayerPackMap.Add(obj.Header.Uuid, new PlayerPackMapData { pack = zipPack, type = ResourcePackType.Resources });
 						}
 					}
-					else
-					{
-						Log.Error($"No manifest.json found in {zipPack}");
-					}
+					PlayerPackData = packInfos;
 				}
-
-				packInfo.resourcePacks = resourcePacks;
+				
+				packInfo.resourcePacks = packInfos;
 			}
-			else
-			{
-				Log.Error($"Resource directory {directory} does not exist.");
-			}
-
+			Console.WriteLine("Sending McpeResourcePacksInfo");
 			SendPacket(packInfo);
 		}
-
 
 		public virtual void SendResourcePackStack()
 		{
 			McpeResourcePackStack packStack = McpeResourcePackStack.CreateObject();
 			packStack.gameVersion = McpeProtocolInfo.GameVersion;
-			packStack.experiments = new Experiments();
 
-			var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
-
-			if (Directory.Exists(directory))
+			if (_serverHaveResources)
 			{
-				Log.Debug($"Loading resource pack stack from: {directory}");
-
-				var resourcePackIdVersions = new ResourcePackIdVersions();
-
-				foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
+				var packVersions = new ResourcePackIdVersions();
+				foreach (var packData in PlayerPackData)
 				{
-					Log.Debug($"Processing resource pack for stack: {zipPack}");
-
-					var archive = ZipFile.OpenRead(zipPack);
-					var manifestEntry = archive.Entries.FirstOrDefault(e => e.FullName == "manifest.json");
-
-					if (manifestEntry != null)
-					{
-						using (var stream = manifestEntry.Open())
-						using (var reader = new StreamReader(stream))
-						{
-							var jsonContent = reader.ReadToEnd();
-							var manifest = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
-
-							resourcePackIdVersions.Add(new PackIdVersion
-							{
-								Id = manifest.Header.Uuid,
-								Version = $"{manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}"
-							});
-
-							Log.Debug($"Added to resource pack stack UUID: {manifest.Header.Uuid}, Version: {manifest.Header.Version[0]}.{manifest.Header.Version[1]}.{manifest.Header.Version[2]}");
-						}
-					}
-					else
-					{
-						Log.Error($"No manifest.json found in {zipPack}");
-					}
+					packVersions.Add(new PackIdVersion { Id = packData.UUID, Version = packData.Version });
 				}
-
-				packStack.resourcepackidversions = resourcePackIdVersions;
+				packStack.resourcepackidversions = packVersions;
 			}
-			else
-			{
-				Log.Error($"Resource directory {directory} does not exist.");
-			}
-
+			Console.WriteLine("Sending McpeResourcePackStack");
 			SendPacket(packStack);
 		}
 

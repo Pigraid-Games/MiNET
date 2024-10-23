@@ -290,4 +290,10 @@ namespace MiNET.Utils
 		public string Uuid { get; set; }
 		public List<int> Version { get; set; }
 	}
+
+	public class PlayerPackMapData
+	{
+		public string pack { get; set; }
+		public ResourcePackType type { get; set; }
+	}
 }

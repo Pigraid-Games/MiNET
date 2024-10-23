@@ -2310,6 +2310,7 @@ namespace MiNET.Net
 		public ResourcePackIdVersions resourcepackidversions;
 		public string gameVersion;
 		public Experiments experiments;
+		public bool experimentsPreviouslyToggled;
 		public bool useVanillaEditorPacks;
 
 		public McpeResourcePackStack()
@@ -2329,6 +2330,7 @@ namespace MiNET.Net
 			Write(resourcepackidversions);
 			Write(gameVersion);
 			Write(experiments);
+			Write(experimentsPreviouslyToggled);
 			Write(useVanillaEditorPacks);
 
 			AfterEncode();
@@ -2348,6 +2350,7 @@ namespace MiNET.Net
 			resourcepackidversions = ReadResourcePackIdVersions();
 			gameVersion = ReadString();
 			experiments = ReadExperiments();
+			experimentsPreviouslyToggled = ReadBool();
 			useVanillaEditorPacks = ReadBool();
 
 			AfterDecode();
@@ -2365,6 +2368,7 @@ namespace MiNET.Net
 			resourcepackidversions = default;
 			gameVersion = default;
 			experiments = default;
+			experimentsPreviouslyToggled = default(bool);
 			useVanillaEditorPacks = default;
 		}
 
