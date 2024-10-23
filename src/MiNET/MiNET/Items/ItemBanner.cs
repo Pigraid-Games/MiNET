@@ -49,14 +49,14 @@ namespace MiNET.Items
 			{
 				var banner = new StandingBanner();
 				banner.ExtraData = ExtraData;
-				banner.Base = Metadata;
+				banner.BaseColor = Metadata;
 				Block = banner;
 			}
 			else
 			{
 				var banner = new WallBanner();
 				banner.ExtraData = ExtraData;
-				banner.Base = Metadata;
+				banner.BaseColor = Metadata;
 				Block = banner;
 			}
 

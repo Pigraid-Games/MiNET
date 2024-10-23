@@ -2,6 +2,8 @@
 using fNbt;
 using fNbt.Serialization;
 using fNbt.Serialization.NamingStrategy;
+using log4net;
+using MiNET.BlockEntities;
 using MiNET.Utils.Vectors;
 
 namespace MiNET.Worlds.Anvil.Data
@@ -9,6 +11,8 @@ namespace MiNET.Worlds.Anvil.Data
 	[NbtObject]
 	public class RegionChunk
 	{
+		private static readonly ILog Log = LogManager.GetLogger(typeof(RegionChunk));
+
 		public int DataVersion { get; set; }
 
 		public long InhabitedTime { get; set; }
@@ -60,6 +64,38 @@ namespace MiNET.Worlds.Anvil.Data
 			foreach (var section in Sections)
 			{
 				section.PopulateChunk(chunk, DataVersion);
+			}
+
+			ReadBlockEntites(chunk);
+		}
+
+		private void ReadBlockEntites(ChunkColumn chunk)
+		{
+			if (BlockEntities == null) return;
+
+			foreach (var nbtTag in BlockEntities)
+			{
+				var converted = AnvilToBedrockBlockEntityConverter.Convert(nbtTag);
+				int x = converted["x"].IntValue;
+				int y = converted["y"].IntValue;
+				int z = converted["z"].IntValue;
+
+				var existingBlockEntity = chunk.GetBlockEntity(new BlockCoordinates(x, y, z));
+				if (existingBlockEntity == null || existingBlockEntity.Id != converted["id"].StringValue)
+				{
+					var blockEntity = NbtConvert.FromNbt<BlockEntity>(converted);
+					if (blockEntity == null)
+					{
+						Log.Warn($"Loaded unknown block entity [{converted["id"].StringValue}] \norigin: {nbtTag}\nconverted: {converted}");
+						continue;
+					}
+
+					chunk.SetBlockEntity(blockEntity);
+				}
+				else
+				{
+					existingBlockEntity.SetCompound(converted);
+				}
 			}
 		}
 

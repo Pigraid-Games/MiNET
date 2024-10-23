@@ -5,15 +5,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using fNbt;
 using fNbt.Serialization;
 using log4net;
-using MiNET.BlockEntities;
 using MiNET.Blocks;
-using MiNET.Items;
 using MiNET.Net;
 using MiNET.Utils;
 using MiNET.Utils.Vectors;
@@ -248,12 +245,6 @@ namespace MiNET.Worlds.Anvil
 						throw new Exception($"CX={coordinates.X}, CZ={coordinates.Z}, NBT wrong compression. Expected 0x02, got 0x{compressionMode:X2}. " +
 											$"Offset={offset}, length={length}\n{Packet.HexDump(waste)}");
 
-					var data = NbtSerializer.Read<RegionChunk>(regionFile, NbtCompression.ZLib);
-
-					//var isPocketEdition = false; //obsolete
-					//if (dataTag.Contains("MCPE BID"))
-					//	isPocketEdition = dataTag["MCPE BID"].ByteValue == 1;
-
 					var chunk = new ChunkColumn((x, z, i) => new AnvilSubChunk(BiomeManager, x, z, i))
 					{
 						X = coordinates.X,
@@ -264,10 +255,14 @@ namespace MiNET.Worlds.Anvil
 						NeedSave = false
 					};
 
-					data.PopulateChunk(chunk);
-					ReadBlockEntites(data, chunk);
 
-					//NbtList tileTicks = dataTag["TileTicks"] as NbtList;
+					var data = NbtSerializer.Read<RegionChunk>(regionFile, NbtCompression.ZLib);
+
+					//var isPocketEdition = false; //obsolete
+					//if (dataTag.Contains("MCPE BID"))
+					//	isPocketEdition = dataTag["MCPE BID"].ByteValue == 1;
+
+					data.PopulateChunk(chunk);
 
 					//if (Dimension == Dimension.Overworld && Config.GetProperty("CalculateLights", false))
 					//{
@@ -310,114 +305,6 @@ namespace MiNET.Worlds.Anvil
 			}
 
 			return chunkColumn;
-		}
-
-		private void ReadBlockEntites(RegionChunk data, ChunkColumn chunk)
-		{
-			var blockEntities = data.BlockEntities;
-			if (blockEntities != null)
-				foreach (var nbtTag in blockEntities)
-				{
-					var blockEntityTag = (NbtCompound) nbtTag.Clone();
-					string entityId = blockEntityTag["id"].StringValue;
-					int x = blockEntityTag["x"].IntValue;
-					int y = blockEntityTag["y"].IntValue;
-					int z = blockEntityTag["z"].IntValue;
-
-					if (entityId.StartsWith("minecraft:"))
-					{
-						var id = entityId.Split(':')[1];
-
-						entityId = id.First().ToString().ToUpper() + id.Substring(1);
-						if (entityId == "Flower_pot") entityId = "FlowerPot";
-						if (entityId == "Ender_chest") entityId = "EnderChest";
-						else if (entityId == "Shulker_box") entityId = "ShulkerBox";
-						else if (entityId == "Mob_spawner") entityId = "MobSpawner";
-
-						blockEntityTag["id"] = new NbtString("id", entityId);
-					}
-
-					BlockEntity blockEntity = BlockEntityFactory.GetBlockEntityById(entityId);
-
-					if (blockEntity != null)
-					{
-						blockEntityTag.Name = string.Empty;
-						blockEntity.Coordinates = new BlockCoordinates(x, y, z);
-
-						if (blockEntity is SignBlockEntity)
-						{
-							if (Log.IsDebugEnabled)
-								Log.Debug($"Loaded sign block entity\n{blockEntityTag}");
-							// Remove the JSON stuff and get the text out of extra data.
-							// TAG_String("Text2"): "{"extra":["10c a loaf!"],"text":""}"
-							CleanSignText(blockEntityTag, "Text1");
-							CleanSignText(blockEntityTag, "Text2");
-							CleanSignText(blockEntityTag, "Text3");
-							CleanSignText(blockEntityTag, "Text4");
-						}
-						else if (blockEntity is ChestBlockEntity || blockEntity is ShulkerBoxBlockEntity)
-						{
-							if (blockEntity is ShulkerBoxBlockEntity)
-							{
-								//var meta = chunk.GetMetadata(x & 0x0f, y, z & 0x0f);
-
-								//blockEntityTag["facing"] = new NbtByte("facing", (byte) (meta >> 4));
-
-								//chunk.SetBlock(x & 0x0f, y, z & 0x0f, 218,(byte) (meta - ((byte) (meta >> 4) << 4)));
-							}
-
-							var items = (NbtList) blockEntityTag["Items"];
-
-							if (items != null)
-								for (byte i = 0; i < items.Count; i++)
-								{
-									var sourceTag = (NbtCompound) items[i];
-
-									string itemName = sourceTag["id"].StringValue;
-
-									var item = ItemFactory.GetItem(itemName);
-									var itemTag = NbtConvert.ToNbt<NbtCompound>(item);
-									itemTag.Remove("Count");
-
-									sourceTag.Remove("id");
-									sourceTag.AddRange(itemTag);
-								}
-						}
-						else
-						{
-							if (Log.IsDebugEnabled) Log.Debug($"Loaded block entity\n{blockEntityTag}");
-							// TODO - 1.20 - update
-							//blockEntity.SetCompound(blockEntityTag);
-							//blockEntityTag = blockEntity.GetCompound();
-						}
-
-						var coordinates = new BlockCoordinates(x, y, z);
-						var existingBlockEntity = chunk.GetBlockEntity(coordinates);
-						var be = NbtConvert.FromNbt<BlockEntity>(blockEntityTag);
-
-						if (existingBlockEntity == null)
-						{
-							chunk.SetBlockEntity(be);
-						}
-						//else
-						//{
-						//	existingBlockEntity.AddRange(blockEntityTag.ExceptBy(existingBlockEntity.Select(tag => tag.Name), tag => tag.Name).Select(tag => (NbtTag) tag.Clone()));
-						//}
-					}
-					else
-						if (Log.IsDebugEnabled)
-							Log.Debug($"Loaded unknown block entity\n{blockEntityTag}");
-				}
-		}
-
-		private static Regex _regex = new Regex(@"^((\{""extra"":\[)?)(\{""text"":"".*?""})(],)?(""text"":"".*?""})?$");
-
-		private static void CleanSignText(NbtCompound blockEntityTag, string tagName)
-		{
-			// TODO - ?
-			//var text = blockEntityTag[tagName].StringValue;
-			//var replace = /*Regex.Unescape*/(_regex.Replace(text, "$3"));
-			//blockEntityTag[tagName] = new NbtString(tagName, replace);
 		}
 
 		private static byte Nibble4(byte[] arr, int index)

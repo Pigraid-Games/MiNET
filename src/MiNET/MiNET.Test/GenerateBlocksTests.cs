@@ -836,13 +836,14 @@ namespace MiNET.Test
 					"attached_pumpkin_stem" or "pumpkin_stem" or
 					"repeating_command_block" or "chain_command_block" or
 					"command_block" or
-					"attached_melon_stem" or "melon_stem" or "wall_banner" => nameof(OldFacingDirection1),
+					"attached_melon_stem" or "melon_stem" => nameof(OldFacingDirection1),
 					_ when name.EndsWith("fence_gate") => nameof(OldFacingDirection4),
 
 					"end_rod" or "piston" or "sticky_piston" or "piston_head" or
 					"piston_arm_collision" or "sticky_piston_arm_collision" => nameof(OldFacingDirection3),
 
-					"skull" or "ladder" or "frame" or "glow_frame" or "jigsaw" => nameof(OldFacingDirection4),
+					"skull" or "ladder" or "frame" or 
+					"glow_frame" or "jigsaw" or "wall_banner" => nameof(OldFacingDirection4),
 					_ when name.EndsWith("_button") || name.EndsWith("wall_sign") || 
 						name.EndsWith("hanging_sign") || name.EndsWith("_glazed_terracotta") => nameof(OldFacingDirection4),
 

@@ -51,8 +51,9 @@ namespace MiNET.Utils.Nbt.Converter
 			if (id == null) return null;
 
 			var blockEntity = value as BlockEntity ?? BlockEntityFactory.GetBlockEntityById(id);
+			if (blockEntity == null) return null;
 
-			return base.FromNbt(tag, type, blockEntity, settings);
+			return base.FromNbt(tag, blockEntity.GetType(), blockEntity, settings);
 		}
 
 		public override NbtTag ToNbt(object value, string name, NbtSerializerSettings settings)

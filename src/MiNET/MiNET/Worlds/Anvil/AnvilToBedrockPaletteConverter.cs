@@ -627,7 +627,7 @@ namespace MiNET.Worlds.Anvil
 			for (var i = 0; i < _colorsList.Length; i++)
 			{
 				var color = _colorsList[i];
-				var blockEntity = new BannerBlockEntity() { Base = 15 - i };
+				var blockEntity = new BannerBlockEntity() { BaseColor = 15 - i };
 
 				var banerMap = new BlockStateMapper(context =>
 				{
@@ -637,7 +637,7 @@ namespace MiNET.Worlds.Anvil
 
 					return context.OldName.Contains("_wall_banner") ? "minecraft:wall_banner" : "minecraft:standing_banner";
 				},
-					oldFacingDirectionMap,
+					oldFacingDirectionMap4,
 					new PropertyStateMapper("rotation", "ground_sign_direction"));
 
 				_mapper.Add($"minecraft:{color}_banner", banerMap);

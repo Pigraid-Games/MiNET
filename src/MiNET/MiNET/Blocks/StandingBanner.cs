@@ -27,7 +27,6 @@ using System;
 using System.Numerics;
 using fNbt;
 using MiNET.BlockEntities;
-using MiNET.Utils;
 using MiNET.Utils.Vectors;
 using MiNET.Worlds;
 
@@ -35,7 +34,7 @@ namespace MiNET.Blocks
 {
 	public partial class StandingBanner : Block
 	{
-		public int Base { get; set; }
+		public int BaseColor { get; set; }
 		public NbtCompound ExtraData { get; set; }
 
 		public StandingBanner() : base()
@@ -60,7 +59,7 @@ namespace MiNET.Blocks
 			var bannerBlockEntity = new BannerBlockEntity
 			{
 				Coordinates = Coordinates,
-				Base = Base,
+				BaseColor = BaseColor,
 			};
 			bannerBlockEntity.SetCompound(ExtraData);
 			world.SetBlockEntity(bannerBlockEntity);
