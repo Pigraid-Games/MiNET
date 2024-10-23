@@ -49,6 +49,7 @@ using MiNET.Utils.Nbt;
 using MiNET.Utils.Skins;
 using MiNET.Utils.Vectors;
 using Newtonsoft.Json;
+using static MiNET.Net.McpePlayerAuthInput;
 
 namespace MiNET.Net
 {

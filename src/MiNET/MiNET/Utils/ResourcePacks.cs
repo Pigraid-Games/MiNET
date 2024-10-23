@@ -101,6 +101,8 @@ namespace MiNET.Utils
 		/// </summary>
 		public bool RtxEnabled { get; set; }
 
+		public string CndUrls { get; set; }
+
 		public void Write(Packet packet)
 		{
 			packet.Write(UUID);
@@ -112,6 +114,7 @@ namespace MiNET.Utils
 			packet.Write(HasScripts);
 			packet.Write(IsAddonPack);
 			packet.Write(RtxEnabled);
+			packet.Write(CndUrls);
 		}
 
 		public static ResourcePackInfo Read(Packet packet)
@@ -126,7 +129,8 @@ namespace MiNET.Utils
 				ContentIdentity = packet.ReadString(),
 				HasScripts = packet.ReadBool(),
 				IsAddonPack = packet.ReadBool(),
-				RtxEnabled = packet.ReadBool()
+				RtxEnabled = packet.ReadBool(),
+				CndUrls = packet.ReadString()
 			};
 		}
 	}

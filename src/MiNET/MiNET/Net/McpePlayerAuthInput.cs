@@ -50,10 +50,8 @@ public partial class McpePlayerAuthInput : Packet<McpePlayerAuthInput>
 	/// </summary>
 	public PlayerInteractionModel InteractionModel;
 	
-	/// <summary>
-	///		GazeDirection is the direction in which the player is gazing, when the PlayMode is PlayModeReality: In other words, when the player is playing in virtual reality.
-	/// </summary>
-	public Vector3 GazeDirection;
+	public Vector2 InteractRotation;
+	public Vector3 CameraOrientation;
 	
 	/// <summary>
 	///		Tick is the server tick at which the packet was sent. It is used in relation to CorrectPlayerMovePrediction.
@@ -80,11 +78,7 @@ public partial class McpePlayerAuthInput : Packet<McpePlayerAuthInput>
 		InputMode = (PlayerInputMode)ReadUnsignedVarInt();
 		PlayMode = (PlayerPlayMode)ReadUnsignedVarInt();
 		InteractionModel = (PlayerInteractionModel) ReadUnsignedVarInt();
-		//IF VR.
-		if (PlayMode == PlayerPlayMode.VR)
-		{
-			GazeDirection = ReadVector3();
-		}
+		InteractRotation = ReadVector2();
 
 		Tick = ReadUnsignedVarLong();
 		Delta = ReadVector3();
@@ -100,6 +94,7 @@ public partial class McpePlayerAuthInput : Packet<McpePlayerAuthInput>
 		}
 
 		AnalogMoveVector = ReadVector2();
+		CameraOrientation = ReadVector3();
 	}
 
 	partial void AfterEncode()
@@ -113,12 +108,8 @@ public partial class McpePlayerAuthInput : Packet<McpePlayerAuthInput>
 		WriteUnsignedVarInt((uint)InputMode);
 		WriteUnsignedVarInt((uint) PlayMode);
 		WriteUnsignedVarInt((uint)InteractionModel);
+		Write(InteractRotation);
 
-		if (PlayMode == PlayerPlayMode.VR)
-		{
-			Write(GazeDirection);
-		}
-		
 		WriteUnsignedVarLong(Tick);
 		Write(Delta);
 
@@ -128,6 +119,7 @@ public partial class McpePlayerAuthInput : Packet<McpePlayerAuthInput>
 		}
 
 		Write(AnalogMoveVector);
+		Write(CameraOrientation);
 	}
 
 	/// <inheritdoc />
@@ -141,6 +133,7 @@ public partial class McpePlayerAuthInput : Packet<McpePlayerAuthInput>
 		InputMode = PlayerInputMode.Mouse;
 		PlayMode = PlayerPlayMode.Normal;
 		InteractionModel = PlayerInteractionModel.Touch;
+		InteractRotation = default(Vector2);
 		Tick = 0;
 		Delta = Vector3.Zero;
 		VehicleInfo = null;

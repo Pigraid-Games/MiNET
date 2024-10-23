@@ -116,6 +116,8 @@ namespace MiNET
 		public ResourcePackInfos PlayerPackDataB { get; set; } = new ResourcePackInfos();
 		public Dictionary<string, PlayerPackMapData> PlayerPackMap = new Dictionary<string, PlayerPackMapData>();
 
+		public long CurrentTick { get; set; }
+
 
 		public Player(MiNetServer server, IPEndPoint endPoint) : base(EntityType.None, null)
 		{
@@ -188,7 +190,6 @@ namespace MiNET
 			chunkData.chunkIndex = message.chunkIndex;
 			chunkData.progress = 16384 * message.chunkIndex;
 			chunkData.payload = GetChunk(content, (int) chunkData.chunkIndex, 16384);
-			Console.WriteLine("Sending McpeResourcePackChunkData");
 			SendPacket(chunkData);
 		}
 
@@ -370,7 +371,6 @@ namespace MiNET
 					dataInfo.hash = packHash;
 					dataInfo.isPremium = false;
 					dataInfo.packType = (byte) PlayerPackMap[uuid].type;
-					Console.WriteLine("Sending McpeResourcePackStack");
 					SendPacket(dataInfo);
 				}
 				return;
@@ -457,7 +457,6 @@ namespace MiNET
 				
 				packInfo.resourcePacks = packInfos;
 			}
-			Console.WriteLine("Sending McpeResourcePacksInfo");
 			SendPacket(packInfo);
 		}
 
@@ -475,7 +474,6 @@ namespace MiNET
 				}
 				packStack.resourcepackidversions = packVersions;
 			}
-			Console.WriteLine("Sending McpeResourcePackStack");
 			SendPacket(packStack);
 		}
 
@@ -1873,6 +1871,7 @@ namespace MiNET
 			McpeSetEntityData mcpeSetEntityData = McpeSetEntityData.CreateObject();
 			mcpeSetEntityData.runtimeEntityId = EntityManager.EntityIdSelf;
 			mcpeSetEntityData.metadata = metadata;
+			mcpeSetEntityData.tick = CurrentTick;
 			SendPacket(mcpeSetEntityData);
 
 			base.BroadcastSetEntityData(metadata);
@@ -1883,6 +1882,7 @@ namespace MiNET
 			McpeSetEntityData mcpeSetEntityData = McpeSetEntityData.CreateObject();
 			mcpeSetEntityData.runtimeEntityId = EntityManager.EntityIdSelf;
 			mcpeSetEntityData.metadata = GetMetadata();
+			mcpeSetEntityData.tick = CurrentTick;
 			SendPacket(mcpeSetEntityData);
 		}
 
@@ -3235,6 +3235,7 @@ namespace MiNET
 			McpeUpdateAttributes attributesPackate = McpeUpdateAttributes.CreateObject();
 			attributesPackate.runtimeEntityId = EntityManager.EntityIdSelf;
 			attributesPackate.attributes = attributes;
+			attributesPackate.tick = CurrentTick;
 			SendPacket(attributesPackate);
 		}
 
@@ -3399,6 +3400,7 @@ namespace MiNET
 			McpeSetEntityMotion motions = McpeSetEntityMotion.CreateObject();
 			motions.runtimeEntityId = EntityManager.EntityIdSelf;
 			motions.velocity = velocity;
+			motions.tick = CurrentTick;
 			SendPacket(motions);
 		}
 
@@ -3795,6 +3797,17 @@ namespace MiNET
 			McpeRemoveEntity mcpeRemovePlayer = McpeRemoveEntity.CreateObject();
 			mcpeRemovePlayer.entityIdSelf = EntityId;
 			Level.RelayBroadcast(this, players, mcpeRemovePlayer);
+		}
+
+		public virtual void CorrectPlayerMovement()
+		{
+			McpeCorrectPlayerMovement packet = McpeCorrectPlayerMovement.CreateObject();
+			packet.Type = (byte) (Vehicle == 0 ? 0 : 3);
+			packet.Postition = KnownPosition;
+			packet.Velocity = Velocity;
+			packet.OnGround = !IsGliding && IsOnGround;
+			packet.Tick = CurrentTick;
+			SendPacket(packet);
 		}
 
 

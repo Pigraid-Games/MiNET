@@ -34,20 +34,20 @@ using System.Threading;
 using MiNET.Utils; 
 using MiNET.Utils.Skins;
 using MiNET.Items;
-using MiNET.Crafting;
 using MiNET.Net.RakNet;
 using MiNET.Utils.Metadata;
 using MiNET.Utils.Vectors;
 using MiNET.Utils.Nbt;
 using MiNET.Net.Crafting;
 using System.Collections.Generic;
+using MiNET.Effects;
 
 namespace MiNET.Net
 {
 	public class McpeProtocolInfo
 	{
-		public const int ProtocolVersion = 729;
-		public const string GameVersion = "1.21.30";
+		public const int ProtocolVersion = 748;
+		public const string GameVersion = "1.21.40";
 	}
 
 	public interface IMcpeMessageHandler
@@ -2245,7 +2245,6 @@ namespace MiNET.Net
 		public bool hasAddons;
 		public bool hasScripts;
 		public ResourcePackInfos resourcePacks;
-		public CdnUrls cdnUrls;
 
 		public McpeResourcePacksInfo()
 		{
@@ -2263,7 +2262,6 @@ namespace MiNET.Net
 			Write(hasAddons);
 			Write(hasScripts);
 			Write(resourcePacks);
-			Write(cdnUrls);
 
 			AfterEncode();
 		}
@@ -2281,7 +2279,6 @@ namespace MiNET.Net
 			hasAddons = ReadBool();
 			hasScripts = ReadBool();
 			resourcePacks = ReadResourcePackInfos();
-			cdnUrls = ReadCdnUrls();
 
 			AfterDecode();
 		}
@@ -2297,7 +2294,6 @@ namespace MiNET.Net
 			hasAddons = default;
 			hasScripts = default;
 			resourcePacks = default;
-			cdnUrls = default;
 		}
 
 	}
@@ -3679,7 +3675,7 @@ namespace MiNET.Net
 			WriteSignedVarInt(amplifier);
 			Write(particles);
 			WriteSignedVarInt(duration);
-			Write(tick);
+			WriteUnsignedVarLong(tick);
 
 			AfterEncode();
 		}
@@ -3699,7 +3695,7 @@ namespace MiNET.Net
 			amplifier = ReadSignedVarInt();
 			particles = ReadBool();
 			duration = ReadSignedVarInt();
-			tick = ReadLong();
+			tick = ReadUnsignedVarLong();
 
 			AfterDecode();
 		}
@@ -4898,7 +4894,7 @@ namespace MiNET.Net
 		public uint inventoryId;
 		public ItemStacks input;
 		public FullContainerName containerName;
-		public uint dynamicContainerId;
+		public Item storageItem;
 
 		public McpeInventoryContent()
 		{
@@ -4915,7 +4911,7 @@ namespace MiNET.Net
 			WriteUnsignedVarInt(inventoryId);
 			Write(input);
 			Write(containerName);
-			WriteUnsignedVarInt(dynamicContainerId);
+			Write(storageItem);
 
 			AfterEncode();
 		}
@@ -4932,7 +4928,7 @@ namespace MiNET.Net
 			inventoryId = ReadUnsignedVarInt();
 			input = ReadItemStacks();
 			containerName = ReadFullContainerName();
-			dynamicContainerId = ReadUnsignedVarInt();
+			storageItem = ReadItem();
 
 			AfterDecode();
 		}
@@ -4947,7 +4943,7 @@ namespace MiNET.Net
 			inventoryId = default;
 			input = default;
 			containerName = default;
-			dynamicContainerId = default;
+			storageItem = default(Item);
 		}
 
 	}
@@ -4958,7 +4954,7 @@ namespace MiNET.Net
 		public uint inventoryId;
 		public uint slot;
 		public FullContainerName containerName;
-		public uint dynamicContainerId;
+		public Item storageItem;
 		public Item item;
 
 		public McpeInventorySlot()
@@ -4976,7 +4972,7 @@ namespace MiNET.Net
 			WriteUnsignedVarInt(inventoryId);
 			WriteUnsignedVarInt(slot);
 			Write(containerName);
-			WriteUnsignedVarInt(dynamicContainerId);
+			Write(storageItem);
 			Write(item);
 
 			AfterEncode();
@@ -4994,7 +4990,7 @@ namespace MiNET.Net
 			inventoryId = ReadUnsignedVarInt();
 			slot = ReadUnsignedVarInt();
 			containerName = ReadFullContainerName();
-			dynamicContainerId = ReadUnsignedVarInt();
+			storageItem = ReadItem();
 			item = ReadItem();
 
 			AfterDecode();
@@ -5010,7 +5006,7 @@ namespace MiNET.Net
 			inventoryId = default;
 			slot = default;
 			containerName = default;
-			dynamicContainerId = default;
+			storageItem = default(Item);
 			item = default;
 		}
 
@@ -11364,6 +11360,55 @@ namespace MiNET.Net
 			skin = default;
 		}
 
+	}
+
+	public partial class McpeCorrectPlayerMovement : Packet<McpeCorrectPlayerMovement>
+	{
+		public byte Type; // = null;
+		public Vector3 Postition; // = null;
+		public Vector3 Velocity; // = null;
+		public bool OnGround; // = null;
+		public long Tick; // = null;
+		public McpeCorrectPlayerMovement()
+		{
+			Id = 0xA1;
+			IsMcpe = true;
+		}
+		protected override void EncodePacket()
+		{
+			base.EncodePacket();
+			BeforeEncode();
+			Write(Type);
+			Write(Postition);
+			Write(Velocity);
+			Write(OnGround);
+			WriteUnsignedVarLong(Tick);
+			AfterEncode();
+		}
+		partial void BeforeEncode();
+		partial void AfterEncode();
+		protected override void DecodePacket()
+		{
+			base.DecodePacket();
+			BeforeDecode();
+			Type = ReadByte();
+			Postition = ReadVector3();
+			Velocity = ReadVector3();
+			OnGround = ReadBool();
+			Tick = ReadUnsignedVarLong();
+			AfterDecode();
+		}
+		partial void BeforeDecode();
+		partial void AfterDecode();
+		protected override void ResetPacket()
+		{
+			base.ResetPacket();
+			Type = default(byte);
+			Postition = default(Vector3);
+			Velocity = default(Vector3);
+			OnGround = default(bool);
+			Tick = default(long);
+		}
 	}
 
 }
