@@ -29,6 +29,7 @@ namespace MiNET.Items
 	{
 		public ItemBook() : base()
 		{
+			MaxStackSize = 1;
 		}
 	}
 
@@ -36,6 +37,7 @@ namespace MiNET.Items
 	{
 		public ItemEnchantedBook() : base()
 		{
+			MaxStackSize = 1;
 		}
 	}
 

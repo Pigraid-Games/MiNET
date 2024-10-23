@@ -111,6 +111,9 @@ namespace MiNET.Entities
 		{
 		}
 
+		public bool IsSwimming { get; set; }
+
+
 		public enum MetadataFlags
 		{
 			EntityFlags = 0,

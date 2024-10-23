@@ -4893,7 +4893,7 @@ namespace MiNET.Net
 
 		public uint inventoryId;
 		public ItemStacks input;
-		public FullContainerName containerName;
+		public FullContainerName containerName = new FullContainerName();
 		public Item storageItem;
 
 		public McpeInventoryContent()
@@ -4940,12 +4940,11 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			inventoryId = default;
-			input = default;
-			containerName = default;
+			inventoryId = default(uint);
+			input = default(ItemStacks);
 			storageItem = default(Item);
+			containerName = default(FullContainerName);
 		}
-
 	}
 
 	public partial class McpeInventorySlot : Packet<McpeInventorySlot>
@@ -4953,7 +4952,7 @@ namespace MiNET.Net
 
 		public uint inventoryId;
 		public uint slot;
-		public FullContainerName containerName;
+		public FullContainerName containerName = new FullContainerName();
 		public Item storageItem;
 		public Item item;
 
@@ -5003,13 +5002,12 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			inventoryId = default;
-			slot = default;
-			containerName = default;
+			inventoryId = default(uint);
+			slot = default(uint);
+			containerName = default(FullContainerName);
 			storageItem = default(Item);
-			item = default;
+			item = default(Item);
 		}
-
 	}
 
 	public partial class McpeContainerSetData : Packet<McpeContainerSetData>
@@ -11364,11 +11362,11 @@ namespace MiNET.Net
 
 	public partial class McpeCorrectPlayerMovement : Packet<McpeCorrectPlayerMovement>
 	{
-		public byte Type; // = null;
-		public Vector3 Postition; // = null;
-		public Vector3 Velocity; // = null;
-		public bool OnGround; // = null;
-		public long Tick; // = null;
+		public byte Type;
+		public Vector3 Postition;
+		public Vector3 Velocity;
+		public bool OnGround;
+		public long Tick;
 		public McpeCorrectPlayerMovement()
 		{
 			Id = 0xA1;
