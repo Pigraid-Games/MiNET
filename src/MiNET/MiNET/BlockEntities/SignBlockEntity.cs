@@ -23,8 +23,10 @@
 
 #endregion
 
+using System;
 using System.Drawing;
 using fNbt.Serialization;
+using MiNET.Entities;
 
 namespace MiNET.BlockEntities
 {
@@ -126,5 +128,42 @@ namespace MiNET.BlockEntities
 		public static Color Green { get; } = Color.FromArgb(94, 124, 22);
 
 		public static Color Red { get; } = Color.FromArgb(176, 46, 38);
+
+		public static Color Parse(string value)
+		{
+			if (TryParse(value, out var color))
+			{
+				return color;
+			}
+
+			throw new ArgumentOutOfRangeException(nameof(value), value, $"Unexpected color name");
+		}
+
+		public static bool TryParse(string value, out Color color)
+		{
+			Color? c = value.ToLower() switch
+			{
+				"black" => Black,
+				"white" => White,
+				"orange" => Orange,
+				"magenta" => Magenta,
+				"light_blue" => LightBlue,
+				"yellow" => Yellow,
+				"lime" => Lime,
+				"pink" => Pink,
+				"gray" => Gray,
+				"light_gray" => LightGray,
+				"cyan" => Cyan,
+				"purple" => Purple,
+				"blue" => Blue,
+				"brown" => Brown,
+				"green" => Green,
+				"red" => Red,
+				_ => null
+			};
+
+			color = c ?? default;
+			return c != null;
+		}
 	}
 }
