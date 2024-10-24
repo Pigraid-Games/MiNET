@@ -2062,19 +2062,23 @@ namespace MiNET
 
 		private int _lastOrderingIndex;
 		private object _moveSyncLock = new object();
-
 		public virtual void HandleMcpeMovePlayer(McpeMovePlayer message)
 		{
-			if (!IsSpawned || HealthManager.IsDead) return;
+			if (!IsSpawned || HealthManager.IsDead)
+				return;
 
 			if (Server.ServerRole != ServerRole.Node)
 			{
 				lock (_moveSyncLock)
 				{
-					if (_lastOrderingIndex > message.ReliabilityHeader.OrderingIndex) return;
+					if (_lastOrderingIndex > message.ReliabilityHeader.OrderingIndex)
+						return;
 					_lastOrderingIndex = message.ReliabilityHeader.OrderingIndex;
 				}
 			}
+
+			var currentTime = DateTime.UtcNow;
+			var lastUpdateDuration = (double) (currentTime - LastUpdatedTime).Ticks / TimeSpan.TicksPerSecond;
 
 			var newLocation = new PlayerLocation
 			{
@@ -2087,26 +2091,33 @@ namespace MiNET
 			};
 
 			double distanceTo = KnownPosition.DistanceTo(newLocation);
-
-			CurrentSpeed = distanceTo / ((double) (DateTime.UtcNow - LastUpdatedTime).Ticks / TimeSpan.TicksPerSecond);
+			CurrentSpeed = distanceTo / lastUpdateDuration;
 
 			double verticalMove = message.y - 1.62 - KnownPosition.Y;
 
 			bool isOnGround = IsOnGround;
 			bool isFlyingHorizontally = false;
+
 			if (Math.Abs(distanceTo) > 0.01)
 			{
 				isOnGround = CheckOnGround(newLocation);
 				isFlyingHorizontally = DetectSimpleFly(message, isOnGround);
 			}
 
-			if (!AcceptPlayerMove(message, isOnGround, isFlyingHorizontally)) return;
+			if (!AcceptPlayerMove(message, isOnGround, isFlyingHorizontally))
+				return;
 
 			IsFlyingHorizontally = isFlyingHorizontally;
 			IsOnGround = isOnGround;
 
-			// Hunger management
-			if (!IsGliding) HungerManager.Move(Vector3.Distance(new Vector3(KnownPosition.X, 0, KnownPosition.Z), new Vector3(message.x, 0, message.z)));
+			if (!IsGliding)
+			{
+				double horizontalDistance = Vector3.Distance(
+					new Vector3(KnownPosition.X, 0, KnownPosition.Z),
+					new Vector3(message.x, 0, message.z)
+				);
+				HungerManager.Move(horizontalDistance);
+			}
 
 			KnownPosition = newLocation;
 
@@ -2114,21 +2125,22 @@ namespace MiNET
 
 			if (IsFalling)
 			{
-				if (StartFallY == 0) StartFallY = KnownPosition.Y;
+				if (StartFallY == 0)
+					StartFallY = KnownPosition.Y;
 			}
 			else
 			{
-				double damage = Math.Max(0, StartFallY - KnownPosition.Y - 3);
-				if (damage > 0 && !StayInWater(newLocation))
+				double fallDamage = Math.Max(0, StartFallY - KnownPosition.Y - 3);
+				if (fallDamage > 0 && !StayInWater(newLocation))
 				{
-					HealthManager.TakeHit(null, (int) DamageCalculator.CalculatePlayerDamage(null, this, null, damage, DamageCause.Fall), DamageCause.Fall);
+					HealthManager.TakeHit(null, (int) DamageCalculator.CalculatePlayerDamage(null, this, null, fallDamage, DamageCause.Fall), DamageCause.Fall);
 				}
 
 				StartFallY = 0;
 			}
 
-			LastUpdatedTime = DateTime.UtcNow;
-			
+			LastUpdatedTime = currentTime;
+
 			var chunkPosition = new ChunkCoordinates(KnownPosition);
 			if (_currentChunkPosition != chunkPosition && _currentChunkPosition.DistanceTo(chunkPosition) >= MoveRenderDistance)
 			{

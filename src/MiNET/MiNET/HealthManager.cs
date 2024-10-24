@@ -255,6 +255,8 @@ namespace MiNET
 			}
 		}
 
+		public event EventHandler<HealthEventArgs> PlayerKilled;
+
 		private object _killSync = new object();
 
 		public virtual void Kill()
@@ -275,12 +277,10 @@ namespace MiNET
 
 			Entity.BroadcastEntityEvent();
 
+			OnPlayerKilled(new HealthEventArgs(this, LastDamageSource, Entity));
+
 			if (player != null)
 			{
-				//SendWithDelay(2000, () =>
-				//{
-				//});
-
 				Entity.BroadcastSetEntityData();
 				Entity.DespawnEntity();
 
@@ -316,6 +316,13 @@ namespace MiNET
 					Entity.DespawnEntity();
 				});
 			}
+		}
+
+		protected virtual void OnPlayerKilled(HealthEventArgs e)
+		{
+			EventHandler<HealthEventArgs> handler = PlayerKilled;
+			if (handler != null)
+				handler(this, e);
 		}
 
 		private async Task SendWithDelay(int delay, Action action)
