@@ -594,10 +594,9 @@ namespace MiNET.Plugins.Commands
 		}
 
 		[Command]
-		public void Enchant(Player commander, Target target, EnchantmentTypeEnum enchantmentTypeName, int level = 1)
+		public void Enchant(Player commander, EnchantmentTypeEnum enchantmentTypeName, int level = 1)
 		{
-			Player targetPlayer = target.Players.First();
-			Item item = targetPlayer.Inventory.GetItemInHand();
+			Item item = commander.Inventory.GetItemInHand();
 			if (item is ItemAir) return;
 
 			EnchantingType enchanting;
@@ -611,7 +610,7 @@ namespace MiNET.Plugins.Commands
 				Level = (short) level
 			});
 			item.SetEnchantings(enchanings);
-			targetPlayer.Inventory.SendSetSlot(targetPlayer.Inventory.InHandSlot);
+			commander.Inventory.SendSetSlot(commander.Inventory.InHandSlot);
 		}
 
 		[Command]
