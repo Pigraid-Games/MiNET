@@ -51,10 +51,9 @@ namespace MiNET.Plugins.Commands
 		}
 
 		[Command(Name = "title")]
-		public void Title(Player commander, string title, string message)
+		public void Title(Player commander, string title)
 		{
 			commander.SendTitle(title, TitleType.Title, 3, 3, 7);
-			commander.SendTitle(message, TitleType.SubTitle, 3, 3, 7);
 		}
 
 		[Command(Name = "text")]
