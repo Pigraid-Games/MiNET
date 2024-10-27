@@ -25,14 +25,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing.Imaging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
-using Color = System.Drawing.Color;
 
 namespace MiNET.Utils.Skins
 {
@@ -90,7 +87,7 @@ namespace MiNET.Utils.Skins
 		public string GeometryName { get; set; }
 		public string GeometryData { get; set; }
 		public string GeometryDataVersion { get; set; }
-		
+
 		public string ArmSize { get; set; }
 
 		public string SkinColor { get; set; }
@@ -110,7 +107,8 @@ namespace MiNET.Utils.Skins
 
 			var size = bitmap.Height * bitmap.Width * 4;
 
-			if (size != 0x2000 && size != 0x4000 && size != 0x10000) return null;
+			if (size != 0x2000 && size != 0x4000 && size != 0x10000)
+				return null;
 
 			byte[] bytes = new byte[size];
 
@@ -152,7 +150,7 @@ namespace MiNET.Utils.Skins
 					bitmap[x, y] = new Rgba32(r, g, b, a);
 				}
 			}
-			
+
 			bitmap.Save(filename);
 		}
 
@@ -176,7 +174,7 @@ namespace MiNET.Utils.Skins
 			settings.MissingMemberHandling = MissingMemberHandling.Error;
 			//settings.Formatting = Formatting.Indented;
 			settings.ContractResolver = new CamelCasePropertyNamesContractResolver();
-			settings.Converters.Add(new StringEnumConverter {NamingStrategy = new CamelCaseNamingStrategy()});
+			settings.Converters.Add(new StringEnumConverter { NamingStrategy = new CamelCaseNamingStrategy() });
 
 			return JsonConvert.SerializeObject(geometryModel, settings);
 		}

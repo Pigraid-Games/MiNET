@@ -60,7 +60,7 @@ namespace MiNET.Utils.Skins
 	public class Bone : ICloneable
 	{
 		public string Name { get; set; }
-		
+
 		[JsonProperty(PropertyName = "META_BoneType")]
 		public string BoneType { get; set; }
 

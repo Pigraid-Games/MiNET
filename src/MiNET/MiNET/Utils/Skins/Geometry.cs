@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 
 namespace MiNET.Utils.Skins
@@ -42,18 +43,18 @@ namespace MiNET.Utils.Skins
 		public int TextureWidth { get; set; }
 
 		[JsonProperty(PropertyName = "visible_bounds_height")]
-		public int VisibleBoundsHeight { get; set; }
+		public float VisibleBoundsHeight { get; set; }
 
 		[JsonProperty(PropertyName = "visible_bounds_offset")]
-		public int[] VisibleBoundsOffset { get; set; }
+		public float[] VisibleBoundsOffset { get; set; }
 
 		[JsonProperty(PropertyName = "visible_bounds_width")]
-		public int VisibleBoundsWidth { get; set; }
+		public float VisibleBoundsWidth { get; set; }
 
 		public object Clone()
 		{
 			var clone = (Description) MemberwiseClone();
-			clone.VisibleBoundsOffset = VisibleBoundsOffset?.Clone() as int[];
+			clone.VisibleBoundsOffset = VisibleBoundsOffset?.Clone() as float[];
 			return clone;
 		}
 	}
@@ -130,9 +131,11 @@ namespace MiNET.Utils.Skins
 
 			foreach (var bone in Bones)
 			{
-				if (bone.NeverRender) continue;
-				if (bone.Cubes == null || bone.Cubes.Count == 0) continue;
-
+				if (bone.NeverRender)
+					continue;
+				if (bone.Cubes == null || bone.Cubes.Count == 0)
+					continue;
+				var realBoneName = Regex.Replace(bone.Name, "\\d+", ""); //Blockbench ad numbers to bones with same names so lets remove them
 				var cubes = bone.Cubes.ToArray();
 				bone.Cubes.Clear();
 				foreach (var cube in cubes)
@@ -160,13 +163,13 @@ namespace MiNET.Utils.Skins
 										Cube c = new Cube
 										{
 											Face = Face.Inside,
-											Size = new[] {1f, 1f, 1f},
-											Origin = new[] {cubeOrigin[0] + w, cubeOrigin[1] + h, cubeOrigin[2] + d},
-											Uv = new float[] {20, 4},
+											Size = new[] { 1f, 1f, 1f },
+											Origin = new[] { cubeOrigin[0] + w, cubeOrigin[1] + h, cubeOrigin[2] + d },
+											Uv = new float[] { 20, 4 },
 											Velocity = Vector3.Zero
 										};
 										{
-											bool isHead = bone.Name.Equals(BoneName.Head.ToString(), StringComparison.InvariantCultureIgnoreCase);// == BoneName.Head.ToString();
+											bool isHead = realBoneName.Equals(BoneName.Head.ToString(), StringComparison.InvariantCultureIgnoreCase);// == BoneName.Head.ToString();
 											if (packInBody)
 											{
 												if (keepHead && isHead)
@@ -209,12 +212,12 @@ namespace MiNET.Utils.Skins
 									Cube c = new Cube
 									{
 										Face = Face.Front,
-										Size = new[] {1f, 1f, 1f},
-										Origin = new[] {cubeOrigin[0] + w, cubeOrigin[1] + h, cubeOrigin[2] + d - ZTearFactor},
-										Uv = bone.Mirror ? new[] {uvx - w, uvy--} : new[] {uvx + w, uvy--},
+										Size = new[] { 1f, 1f, 1f },
+										Origin = new[] { cubeOrigin[0] + w, cubeOrigin[1] + h, cubeOrigin[2] + d - ZTearFactor },
+										Uv = bone.Mirror ? new[] { uvx - w, uvy-- } : new[] { uvx + w, uvy-- },
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
-									bool isHead = bone.Name == BoneName.Head.ToString();
+									bool isHead = realBoneName == BoneName.Head.ToString();
 									if (isHead || random.NextDouble() < CubeFilterFactor)
 									{
 										if (packInBody)
@@ -258,14 +261,14 @@ namespace MiNET.Utils.Skins
 									Cube c = new Cube
 									{
 										Face = Face.Back,
-										Size = new[] {1f, 1f, 1f},
-										Origin = new[] {cubeOrigin[0] + w, cubeOrigin[1] + h, cubeOrigin[2] + d + ZTearFactor},
-										Uv = !bone.Mirror ? new[] {uvx - w, uvy--} : new[] {uvx + w, uvy--},
+										Size = new[] { 1f, 1f, 1f },
+										Origin = new[] { cubeOrigin[0] + w, cubeOrigin[1] + h, cubeOrigin[2] + d + ZTearFactor },
+										Uv = !bone.Mirror ? new[] { uvx - w, uvy-- } : new[] { uvx + w, uvy-- },
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = bone.Name == BoneName.Head.ToString();
+										bool isHead = realBoneName == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -303,14 +306,14 @@ namespace MiNET.Utils.Skins
 									Cube c = new Cube
 									{
 										Face = Face.Top,
-										Size = new[] {1f, 1f, 1f},
-										Origin = new[] {cubeOrigin[0] + w, cubeOrigin[1] + h + ZTearFactor, cubeOrigin[2] + d},
-										Uv = !bone.Mirror ? new[] {uvx - w, uvy--} : new[] {uvx + w, uvy--},
+										Size = new[] { 1f, 1f, 1f },
+										Origin = new[] { cubeOrigin[0] + w, cubeOrigin[1] + h + ZTearFactor, cubeOrigin[2] + d },
+										Uv = !bone.Mirror ? new[] { uvx - w, uvy-- } : new[] { uvx + w, uvy-- },
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = bone.Name == BoneName.Head.ToString();
+										bool isHead = realBoneName == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -346,14 +349,14 @@ namespace MiNET.Utils.Skins
 									Cube c = new Cube
 									{
 										Face = Face.Bottom,
-										Size = new[] {1f, 1f, 1f},
-										Origin = new[] {cubeOrigin[0] + w, cubeOrigin[1] + h - ZTearFactor, cubeOrigin[2] + d},
-										Uv = new[] {uvx + w, uvy--},
+										Size = new[] { 1f, 1f, 1f },
+										Origin = new[] { cubeOrigin[0] + w, cubeOrigin[1] + h - ZTearFactor, cubeOrigin[2] + d },
+										Uv = new[] { uvx + w, uvy-- },
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = bone.Name == BoneName.Head.ToString();
+										bool isHead = realBoneName == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -392,14 +395,14 @@ namespace MiNET.Utils.Skins
 									{
 										Face = Face.Right,
 										Mirror = bone.Mirror,
-										Size = new[] {1f, 1f, 1f},
-										Origin = new[] {cubeOrigin[0] + w - ZTearFactor, cubeOrigin[1] + h, cubeOrigin[2] + d},
-										Uv = !bone.Mirror ? new[] {uvx - d, uvy--} : new[] {uvx + d, uvy--},
+										Size = new[] { 1f, 1f, 1f },
+										Origin = new[] { cubeOrigin[0] + w - ZTearFactor, cubeOrigin[1] + h, cubeOrigin[2] + d },
+										Uv = !bone.Mirror ? new[] { uvx - d, uvy-- } : new[] { uvx + d, uvy-- },
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = bone.Name == BoneName.Head.ToString();
+										bool isHead = realBoneName == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -438,14 +441,14 @@ namespace MiNET.Utils.Skins
 									{
 										Face = Face.Left,
 										Mirror = bone.Mirror,
-										Size = new[] {1f, 1f, 1f},
-										Origin = new[] {cubeOrigin[0] + w + ZTearFactor, cubeOrigin[1] + h, cubeOrigin[2] + d},
-										Uv = bone.Mirror ? new[] {uvx - d, uvy--} : new[] {uvx + d, uvy--},
+										Size = new[] { 1f, 1f, 1f },
+										Origin = new[] { cubeOrigin[0] + w + ZTearFactor, cubeOrigin[1] + h, cubeOrigin[2] + d },
+										Uv = bone.Mirror ? new[] { uvx - d, uvy-- } : new[] { uvx + d, uvy-- },
 										Velocity = new Vector3(0, (float) (random.NextDouble() * -0.01), 0)
 									};
 									if (random.NextDouble() < CubeFilterFactor)
 									{
-										bool isHead = bone.Name == BoneName.Head.ToString();
+										bool isHead = realBoneName == BoneName.Head.ToString();
 										if (packInBody)
 										{
 											if (keepHead && isHead)
@@ -474,7 +477,7 @@ namespace MiNET.Utils.Skins
 				newBone.Cubes = newCubes;
 
 				Bone head = Bones.SingleOrDefault(b => b.Name == BoneName.Head.ToString());
-				Bones = new List<Bone> {newBone};
+				Bones = new List<Bone> { newBone };
 				if (keepHead && head != null)
 				{
 					Bones.Add(head);

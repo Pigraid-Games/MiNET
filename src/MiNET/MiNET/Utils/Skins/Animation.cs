@@ -2,7 +2,7 @@
 
 namespace MiNET.Utils.Skins
 {
-	
+
 	// Animation Type
 	//	0 - None
 	//	1 - Face

@@ -41,12 +41,13 @@ namespace MiNET.Utils.Skins
 
 		public Geometry FindGeometry(string geometryName, bool matchPartial = true)
 		{
-			string fullName = Geometry.FirstOrDefault(g => matchPartial ? 
-				g.Description.Identifier.StartsWith(geometryName, StringComparison.InvariantCultureIgnoreCase) 
+			string fullName = Geometry.FirstOrDefault(g => matchPartial ?
+				g.Description.Identifier.StartsWith(geometryName, StringComparison.InvariantCultureIgnoreCase)
 				: g.Description.Identifier.Equals(geometryName, StringComparison.InvariantCultureIgnoreCase))
 				?.Description.Identifier;
 
-			if (fullName == null) return null;
+			if (fullName == null)
+				return null;
 
 			Geometry geometry = Geometry.First(g => g.Description.Identifier == fullName);
 			geometry.Name = fullName;
@@ -61,7 +62,8 @@ namespace MiNET.Utils.Skins
 
 		public Geometry CollapseToDerived(Geometry derived)
 		{
-			if(derived == null) throw new ArgumentNullException(nameof(derived));
+			if (derived == null)
+				throw new ArgumentNullException(nameof(derived));
 
 			return derived;
 
