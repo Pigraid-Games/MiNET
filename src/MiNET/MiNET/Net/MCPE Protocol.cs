@@ -41,6 +41,7 @@ using MiNET.Utils.Vectors;
 using MiNET.Utils.Nbt;
 using MiNET.Net.Crafting;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MiNET.Net
 {
@@ -259,6 +260,7 @@ namespace MiNET.Net
 		void HandleMcpeCameraAimAssist(McpeCameraAimAssist message);
 		void HandleMcpeAlexEntityAnimation(McpeAlexEntityAnimation message);
 		void HandleFtlCreatePlayer(FtlCreatePlayer message);
+		void HandleMcpeAnimateEntity(McpeAnimateEntity message);
 	}
 
 	public class McpeClientMessageDispatcher
@@ -687,6 +689,9 @@ namespace MiNET.Net
 					break;
 				case FtlCreatePlayer msg:
 					_messageHandler.HandleFtlCreatePlayer(msg);
+					break;
+				case McpeAnimateEntity msg:
+					_messageHandler.HandleMcpeAnimateEntity(msg);
 					break;
 				default:
 					return false;
@@ -11364,6 +11369,84 @@ namespace MiNET.Net
 			skin = default;
 		}
 
+	}
+
+	public partial class McpeAnimateEntity : Packet<McpeAnimateEntity>
+	{
+
+		public string animationName; // = null;
+		public string nextState; // = null;
+		public string stopExpression; // = null;
+		public int molangVersion; // = null;
+		public string controllerName; // = null;
+		public float blendOutTime; // = null;
+		public long[] entities; // = null;
+
+		public McpeAnimateEntity()
+		{
+			Id = 0x9e;
+			IsMcpe = true;
+		}
+
+		protected override void EncodePacket()
+		{
+			base.EncodePacket();
+
+			BeforeEncode();
+
+			Write(animationName);
+			Write(nextState);
+			Write(stopExpression);
+			Write(molangVersion);
+			Write(controllerName);
+			Write(blendOutTime);
+			WriteUnsignedVarInt((uint) entities.Count());
+			for (int i = 0; i < entities.Count(); i++)
+			{
+				WriteUnsignedVarLong(entities[i]);
+			}
+
+			AfterEncode();
+		}
+
+		partial void BeforeEncode();
+		partial void AfterEncode();
+
+		protected override void DecodePacket()
+		{
+			base.DecodePacket();
+
+			BeforeDecode();
+
+			animationName = ReadString();
+			nextState = ReadString();
+			stopExpression = ReadString();
+			molangVersion = ReadInt();
+			controllerName = ReadString();
+			blendOutTime = ReadFloat();
+			for (int i = 0; i < ReadUnsignedVarInt(); i++)
+			{
+				entities[i] = ReadUnsignedVarLong();
+			}
+
+			AfterDecode();
+		}
+
+		partial void BeforeDecode();
+		partial void AfterDecode();
+
+		protected override void ResetPacket()
+		{
+			base.ResetPacket();
+
+			animationName = default(string);
+			nextState = default(string);
+			stopExpression = default(string);
+			molangVersion = default(int);
+			controllerName = default(string);
+			blendOutTime = default(float);
+			entities = default(long[]);
+		}
 	}
 
 }

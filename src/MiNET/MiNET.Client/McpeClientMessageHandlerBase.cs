@@ -783,6 +783,11 @@ namespace MiNET.Client
 		{
 
 		}
+
+		public void HandleMcpeAnimateEntity(McpeAnimateEntity message)
+		{
+
+		}
 	}
 
 	public class DefaultMessageHandler : McpeClientMessageHandlerBase
