@@ -760,7 +760,7 @@ namespace MiNET
 				case PlayerAction.StartGlide:
 				{
 					IsGliding = true;
-					Height = 0.6;
+					Height /= 3;
 
 					var particle = new WhiteSmokeParticle(Level);
 					particle.Position = KnownPosition.ToVector3();
@@ -771,7 +771,8 @@ namespace MiNET
 				case PlayerAction.StopGlide:
 				{
 					IsGliding = false;
-					Height = 1.8;
+					Height *= 3;
+					Eye
 					break;
 				}
 				case PlayerAction.SetEnchantmentSeed:
@@ -1249,8 +1250,6 @@ namespace MiNET
 				SendAdventureSettings();
 
 				SendPlayerInventory();
-
-				CleanCache();
 
 				ForcedSendChunk(SpawnPosition, false);
 
@@ -2500,6 +2499,7 @@ namespace MiNET
 			if (itemInHand.Id != transaction.Item.Id || itemInHand.Metadata != transaction.Item.Metadata)
 			{
 				Log.Warn($"Attack item mismatch. Expected {itemInHand}, but client reported {transaction.Item}");
+				Inventory.SetHeldItemSlot(transaction.Slot, true);
 			}
 
 			if (!Level.TryGetEntity(transaction.RuntimeEntityId, out Entity target)) return;
@@ -2520,6 +2520,7 @@ namespace MiNET
 			if (itemInHand.Id != transaction.Item.Id || itemInHand.Metadata != transaction.Item.Metadata)
 			{
 				Log.Warn($"Attack item mismatch. Expected {itemInHand}, but client reported {transaction.Item}");
+				Inventory.SetHeldItemSlot(transaction.Slot, true);
 			}
 
 			if (!Level.TryGetEntity(transaction.RuntimeEntityId, out Entity target)) return;
@@ -3574,12 +3575,6 @@ namespace MiNET
 		public override void BroadcastEntityEvent()
 		{
 			BroadcastEntityEvent(HealthManager.Health <= 0 ? 3 : 2);
-
-			if (HealthManager.IsDead)
-			{
-				Player player = HealthManager.LastDamageSource as Player;
-				BroadcastDeathMessage(player, HealthManager.LastDamageCause);
-			}
 		}
 
 		public void BroadcastEntityEvent(int eventId, int data = 0)

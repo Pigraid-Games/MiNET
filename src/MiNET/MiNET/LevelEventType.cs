@@ -227,7 +227,7 @@ namespace MiNET
 		Unfect = 61,
 		LevelUp = 62,
 		BowHit = 63,
-		BulletHit = 64,
+		BulletHit = 64, 
 		ExtinguishFire = 65,
 		ItemFizz = 66,
 		ChestOpen = 67,

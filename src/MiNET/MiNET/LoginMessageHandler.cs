@@ -884,7 +884,6 @@ namespace MiNET
 			player.ClientId = playerInfo.ClientId;
 			player.Skin = playerInfo.Skin;
 			player.PlayerInfo = playerInfo;
-
 			return player;
 		}
 	}
