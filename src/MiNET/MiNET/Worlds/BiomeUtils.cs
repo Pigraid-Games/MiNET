@@ -63,25 +63,24 @@ namespace MiNET.Worlds
 
 				foreach (NbtCompound biomeTag in BiomesCache)
 				{
-					var biome = new Biome()
-					{
-						Name = biomeTag["name_hash"].StringValue,
-						Rain = biomeTag["rain"].ByteValue == 1,
-						Depth = biomeTag["depth"].FloatValue,
-						Downfall = biomeTag["downfall"].FloatValue,
-						Height = biomeTag["height"].FloatValue,
-						Temperature = biomeTag["temperature"].FloatValue,
-						BlueSpores = biomeTag["blue_spores"].FloatValue,
-						RedSpores = biomeTag["red_spores"].FloatValue,
-						Ash = biomeTag["ash"].FloatValue,
-						WhiteAsh = biomeTag["white_ash"].FloatValue,
-						WaterTransparency = biomeTag["waterTransparency"].FloatValue,
-						WaterColor = new RgbaVector(
-							biomeTag["waterColorR"].FloatValue, 
-							biomeTag["waterColorG"].FloatValue,
-							biomeTag["waterColorB"].FloatValue, 
-							biomeTag["waterColorA"].FloatValue),
-					};
+					var biome = new Biome();
+					biome.Name = biomeTag["name_hash"].StringValue;
+					biome.Rain = biomeTag["rain"].ByteValue == 1;
+					biome.Depth = biomeTag["depth"].FloatValue;
+					biome.Downfall = biomeTag["downfall"].FloatValue;
+					biome.Height = biomeTag["height"].FloatValue;
+					biome.Temperature = biomeTag["temperature"].FloatValue;
+					biome.BlueSpores = biomeTag["blue_spores"].FloatValue;
+					biome.RedSpores = biomeTag["red_spores"].FloatValue;
+					biome.Ash = biomeTag["ash"].FloatValue;
+					biome.WhiteAsh = biomeTag["white_ash"].FloatValue;
+					biome.WaterTransparency = biomeTag["waterTransparency"].FloatValue;
+					biome.WaterColor = new RgbaVector(
+						biomeTag["waterColorR"].FloatValue,
+						biomeTag["waterColorG"].FloatValue,
+						biomeTag["waterColorB"].FloatValue,
+						biomeTag["waterColorA"].FloatValue
+					);
 
 					biome.Id = biomeIdMap[biome.Name];
 
