@@ -230,41 +230,62 @@ namespace MiNET.Crafting
 
 			foreach (var recipeData in shapelessCrafting)
 			{
+				// Attempt to retrieve inputs
 				var input = recipeData.Input.Select(data =>
 				{
-					TryGetRecipeIngredientFromExternalData(data, out var ingredient);
-
-					return ingredient;
+					if (TryGetRecipeIngredientFromExternalData(data, out var ingredient))
+					{
+						return ingredient;
+					}
+					else
+					{
+						Log.Warn($"Missing ingredient in shapeless recipe Input: {JsonConvert.SerializeObject(data)}");
+						return null;
+					}
 				}).ToList();
 
+				// Check if any inputs are missing
 				if (input.Any(val => val == null))
 				{
-					Log.Warn($"Missing shapeless recipe Inputs: {JsonConvert.SerializeObject(recipeData)}");
-
-					continue;
+					Log.Warn($"Incomplete shapeless recipe Inputs: {JsonConvert.SerializeObject(recipeData)}");
+					continue; // Skip this recipe if any inputs are missing
 				}
 
+				// Attempt to retrieve outputs
 				var output = recipeData.Output.Select(data =>
 				{
-					InventoryUtils.TryGetItemFromExternalData(data, out var item);
-
-					return item;
+					if (InventoryUtils.TryGetItemFromExternalData(data, out var item))
+					{
+						return item;
+					}
+					else
+					{
+						Log.Warn($"Missing item in shapeless recipe Output: {JsonConvert.SerializeObject(data)}");
+						return null;
+					}
 				}).ToList();
 
+				// Check if any outputs are missing
 				if (output.Any(val => val == null))
 				{
-					Log.Warn($"Missing shapeless recipe Outputs: {JsonConvert.SerializeObject(recipeData)}");
-
-					continue;
+					Log.Warn($"Incomplete shapeless recipe Outputs: {JsonConvert.SerializeObject(recipeData)}");
+					continue; // Skip this recipe if any outputs are missing
 				}
 
-				ShapelessRecipeBase recipe = new ShapelessRecipe(output, input, recipeData.Block) { Priority = recipeData.Priority, UniqueId = _recipeUniqueIdCounter++ };
+				// Create and register the shapeless recipe
+				ShapelessRecipeBase recipe = new ShapelessRecipe(output, input, recipeData.Block)
+				{
+					Priority = recipeData.Priority,
+					UniqueId = _recipeUniqueIdCounter++
+				};
+
 				recipe = getRecipe(recipe);
 				NetworkIdRecipeMap.Add(recipe.UniqueId, recipe);
 				IdRecipeMap.Add(recipe.Id, recipe);
 				Recipes.Add(recipe);
 			}
 		}
+
 
 		private static void LoadShapedChemistryRecipes()
 		{

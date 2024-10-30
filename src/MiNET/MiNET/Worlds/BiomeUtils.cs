@@ -55,22 +55,25 @@ namespace MiNET.Worlds
 		static BiomeUtils()
 		{
 			var assembly = Assembly.GetAssembly(typeof(Biome));
-
 			var biomeIdMap = ResourceUtil.ReadResource<Dictionary<string, int>>("biome_id_map.json", typeof(Biome), "Data");
 
 			using (var stream = assembly.GetManifestResourceStream(typeof(Biome).Namespace + ".Data.biome_definitions.nbt"))
 			{
 				BiomesCache = Packet.ReadNbtCompound(stream, true);
 
-				foreach (NbtCompound biomeTag in BiomesCache)
-				{
-					foreach(var tag in  biomeTag.Tags)
-					{
-						Console.WriteLine($"Tag Name: {tag.Name}, Tag Type: {tag.TagType}, Value: {GetTagValue(tag)}");
-					}
+				var biomeTagEnumerator = BiomesCache.GetEnumerator();
 
+				foreach (var kvp in biomeIdMap)
+				{
+					if (!biomeTagEnumerator.MoveNext())
+						break;
+
+					var biomeTag = biomeTagEnumerator.Current as NbtCompound;
 					var biome = new Biome();
-					biome.Name = "plains"; // Not found in 1.21.40
+					biome.Name = kvp.Key;
+					biome.Id = kvp.Value;
+
+					// Populate biome properties using biomeTag
 					biome.Rain = biomeTag["rain"].ByteValue == 1;
 					biome.Depth = biomeTag["depth"].FloatValue;
 					biome.Downfall = biomeTag["downfall"].FloatValue;
@@ -80,15 +83,14 @@ namespace MiNET.Worlds
 					biome.RedSpores = biomeTag["red_spores"].FloatValue;
 					biome.Ash = biomeTag["ash"].FloatValue;
 					biome.WhiteAsh = biomeTag["white_ash"].FloatValue;
-					biome.WaterTransparency = 0f; // Not found in 1.21.40
+					biome.WaterTransparency = 0f;
 					biome.WaterColor = new RgbaVector(
 						biomeTag["waterColorR"].FloatValue,
 						biomeTag["waterColorG"].FloatValue,
 						biomeTag["waterColorB"].FloatValue
 					);
 
-					biome.Id = biomeIdMap[biome.Name];
-
+					// Add to maps
 					IdBiomeMap.TryAdd(biome.Id, biome);
 					NameBiomeMap.TryAdd(biome.Name, biome);
 				}

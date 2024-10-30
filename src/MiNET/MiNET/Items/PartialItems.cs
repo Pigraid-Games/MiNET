@@ -8914,4 +8914,124 @@ namespace MiNET.Items
 	{
 		public override string Id { get; protected set; } = "minecraft:zombie_villager_spawn_egg";
 	}
+
+	public partial class BrownBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:brown_bundle";
+	}
+
+	public partial class CreeperHead : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:creeper_head";
+	}
+
+	public partial class CyanBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:cyan_bundle";
+	}
+
+	public partial class DragonHead : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:dragon_head";
+	}
+
+	public partial class GrayBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:gray_bundle";
+	}
+
+	public partial class GreenBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:green_bundle";
+	}
+
+	public partial class LightBlueBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:light_blue_bundle";
+	}
+
+	public partial class LightGrayBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:light_gray_bundle";
+	}
+
+	public partial class LimeBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:lime_bundle";
+	}
+
+	public partial class MagentaBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:magenta_bundle";
+	}
+
+	public partial class MushroomStem : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:mushroom_stem";
+	}
+
+	public partial class OrangeBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:orange_bundle";
+	}
+
+	public partial class PiglinHead : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:piglin_head";
+	}
+
+	public partial class PinkBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:pink_bundle";
+	}
+
+	public partial class PlayerHead : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:player_head";
+	}
+
+	public partial class PurpleBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:purple_bundle";
+	}
+
+	public partial class RedBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:red_bundle";
+	}
+
+	public partial class SkeletonSkull : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:skeleton_skull";
+	}
+
+	public partial class WhiteBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:white_bundle";
+	}
+
+	public partial class WitherSkeletonSkull : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:wither_skeleton_skull";
+	}
+
+	public partial class YellowBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:yellow_bundle";
+	}
+
+	public partial class ZombieHead : Item
+	{
+		public override string Id { get; protected set; } = "minecraft:zombie_head";
+	}
+
+	public partial class BlackBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:black_bundle";
+	}
+
+	public partial class BlueBundle : ItemBundle
+	{
+		public override string Id { get; protected set; } = "minecraft:blue_bundle";
+	}
 }
