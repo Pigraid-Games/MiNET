@@ -23,6 +23,7 @@
 
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using fNbt;
@@ -63,8 +64,13 @@ namespace MiNET.Worlds
 
 				foreach (NbtCompound biomeTag in BiomesCache)
 				{
+					foreach(var tag in  biomeTag.Tags)
+					{
+						Console.WriteLine($"Tag Name: {tag.Name}, Tag Type: {tag.TagType}, Value: {GetTagValue(tag)}");
+					}
+
 					var biome = new Biome();
-					biome.Name = biomeTag["name_hash"].StringValue;
+					biome.Name = "plains"; // Not found in 1.21.40
 					biome.Rain = biomeTag["rain"].ByteValue == 1;
 					biome.Depth = biomeTag["depth"].FloatValue;
 					biome.Downfall = biomeTag["downfall"].FloatValue;
@@ -74,20 +80,38 @@ namespace MiNET.Worlds
 					biome.RedSpores = biomeTag["red_spores"].FloatValue;
 					biome.Ash = biomeTag["ash"].FloatValue;
 					biome.WhiteAsh = biomeTag["white_ash"].FloatValue;
-					biome.WaterTransparency = biomeTag["waterTransparency"].FloatValue;
+					biome.WaterTransparency = 0f; // Not found in 1.21.40
 					biome.WaterColor = new RgbaVector(
 						biomeTag["waterColorR"].FloatValue,
 						biomeTag["waterColorG"].FloatValue,
-						biomeTag["waterColorB"].FloatValue,
-						biomeTag["waterColorA"].FloatValue
+						biomeTag["waterColorB"].FloatValue
 					);
 
 					biome.Id = biomeIdMap[biome.Name];
 
-					IdBiomeMap.Add(biome.Id, biome);
-					NameBiomeMap.Add(biome.Name, biome);
+					IdBiomeMap.TryAdd(biome.Id, biome);
+					NameBiomeMap.TryAdd(biome.Name, biome);
 				}
 			}
+		}
+
+		static string GetTagValue(NbtTag tag)
+		{
+			return tag switch
+			{
+				NbtByte byteTag => byteTag.ByteValue.ToString(),
+				NbtShort shortTag => shortTag.ShortValue.ToString(),
+				NbtInt intTag => intTag.IntValue.ToString(),
+				NbtLong longTag => longTag.LongValue.ToString(),
+				NbtFloat floatTag => floatTag.FloatValue.ToString(),
+				NbtDouble doubleTag => doubleTag.DoubleValue.ToString(),
+				NbtString stringTag => stringTag.StringValue,
+				NbtByteArray byteArrayTag => BitConverter.ToString(byteArrayTag.ByteArrayValue),
+				NbtIntArray intArrayTag => string.Join(", ", intArrayTag.IntArrayValue),
+				NbtLongArray longArrayTag => string.Join(", ", longArrayTag.LongArrayValue),
+				NbtList listTag => $"List[{listTag.Count}]",
+				_ => "Unknown Tag Type"
+			};
 		}
 
 		public static Dictionary<int, Biome> IdBiomeMap { get; } = new Dictionary<int, Biome>();
