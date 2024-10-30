@@ -26,38 +26,14 @@ using MiNET.Net;
 
 namespace MiNET.Utils
 {
-	public class ResourcePackInfos : List<ResourcePackInfo>, IPacketDataObject
+	public class ResourcePackInfos : List<ResourcePackInfo>
 	{
-		public void Write(Packet packet)
-		{
-			packet.Write((short) Count); // LE
-			//packet.WriteVarInt(packInfos.Count);
-
-			foreach (var info in this)
-			{
-				packet.Write(info);
-			}
-		}
-
-		public static ResourcePackInfos Read(Packet packet)
-		{
-			var count = packet.ReadShort(); // LE
-			//var count = ReadVarInt(); // LE
-
-			var packInfos = new ResourcePackInfos();
-			for (int i = 0; i < count; i++)
-			{
-				packInfos.Add(ResourcePackInfo.Read(packet));
-			}
-
-			return packInfos;
-		}
 	}
 
-	public class ResourcePackInfo : IPacketDataObject
+	public class ResourcePackInfo
 	{
 		/// <summary>
-		///	The unique identifier for the pack
+		///		The unique identifier for the pack
 		/// </summary>
 		public string UUID { get; set; }
 
@@ -87,178 +63,40 @@ namespace MiNET.Utils
 		public string ContentIdentity { get; set; }
 
 		/// <summary>
-		///	HasScripts specifies if the texture packs has any scripts in it. A client will only download the behaviour pack if it supports scripts, which, up to 1.11, only includes Windows 10.
+		///		HasScripts specifies if the texture packs has any scripts in it. A client will only download the behaviour pack if it supports scripts, which, up to 1.11, only includes Windows 10.
 		/// </summary>
 		public bool HasScripts { get; set; }
 
-		/// <summary>
-		/// Indicates this pack is part of an Add-On. Helps clients determine if the pack must be downloaded to join the server as Add-On packs are required to play without issues.
-		/// </summary>
-		public bool IsAddonPack { get; set; }
+		public bool isAddon { get; set; }
+		public string cndUrls { get; set; }
+	}
 
+	public class TexturePackInfos : List<TexturePackInfo>
+	{
+
+	}
+
+	public class TexturePackInfo : ResourcePackInfo
+	{
 		/// <summary>
 		/// RTXEnabled specifies if the texture pack uses the raytracing technology introduced in 1.16.200.
 		/// </summary>
 		public bool RtxEnabled { get; set; }
-
-		public string CndUrls { get; set; }
-
-		public void Write(Packet packet)
-		{
-			packet.Write(UUID);
-			packet.Write(Version);
-			packet.Write(Size);
-			packet.Write(ContentKey);
-			packet.Write(SubPackName);
-			packet.Write(ContentIdentity);
-			packet.Write(HasScripts);
-			packet.Write(IsAddonPack);
-			packet.Write(RtxEnabled);
-			packet.Write(CndUrls);
-		}
-
-		public static ResourcePackInfo Read(Packet packet)
-		{
-			return new ResourcePackInfo()
-			{
-				UUID = packet.ReadString(),
-				Version = packet.ReadString(),
-				Size = packet.ReadUlong(),
-				ContentKey = packet.ReadString(),
-				SubPackName = packet.ReadString(),
-				ContentIdentity = packet.ReadString(),
-				HasScripts = packet.ReadBool(),
-				IsAddonPack = packet.ReadBool(),
-				RtxEnabled = packet.ReadBool(),
-				CndUrls = packet.ReadString()
-			};
-		}
 	}
 
-	public class ResourcePackIdVersions : List<PackIdVersion>, IPacketDataObject
+	public class ResourcePackIdVersions : List<PackIdVersion>
 	{
-		public void Write(Packet packet)
-		{
-			packet.WriteLength(Count); // LE
-
-			foreach (var info in this)
-			{
-				packet.Write(info);
-			}
-		}
-
-		public static ResourcePackIdVersions Read(Packet packet)
-		{
-			var packInfos = new ResourcePackIdVersions();
-
-			var count = packet.ReadLength();
-			for (int i = 0; i < count; i++)
-			{
-				packInfos.Add(PackIdVersion.Read(packet));
-			}
-
-			return packInfos;
-		}
 	}
 
-	public class PackIdVersion : IPacketDataObject
+	public class PackIdVersion
 	{
 		public string Id { get; set; }
-
 		public string Version { get; set; }
-
 		public string SubPackName { get; set; }
-
-		public void Write(Packet packet)
-		{
-			packet.Write(Id);
-			packet.Write(Version);
-			packet.Write(SubPackName);
-		}
-
-		public static PackIdVersion Read(Packet packet)
-		{
-			return new PackIdVersion
-			{
-				Id = packet.ReadString(),
-				Version = packet.ReadString(),
-				SubPackName = packet.ReadString()
-			};
-		}
 	}
 
-	public class ResourcePackIds : List<string>, IPacketDataObject
+	public class ResourcePackIds : List<string>
 	{
-		public void Write(Packet packet)
-		{
-			packet.Write((short) Count);
-
-			foreach (var id in this)
-			{
-				packet.Write(id);
-			}
-		}
-
-		public static ResourcePackIds Read(Packet packet)
-		{
-			var ids = new ResourcePackIds();
-
-			var count = packet.ReadShort();
-			for (int i = 0; i < count; i++)
-			{
-				ids.Add(packet.ReadString());
-			}
-
-			return ids;
-		}
-	}
-
-	public class CdnUrls : List<CdnUrl>, IPacketDataObject
-	{
-		public void Write(Packet packet)
-		{
-			packet.WriteLength(Count);
-
-			foreach (var cdnUrl in this)
-			{
-				packet.Write(cdnUrl);
-			}
-		}
-
-		public static CdnUrls Read(Packet packet)
-		{
-			var cdnUrls = new CdnUrls();
-
-			var count = packet.ReadLength();
-			for (int i = 0; i < count; i++)
-			{
-				cdnUrls.Add(CdnUrl.Read(packet));
-			}
-
-			return cdnUrls;
-		}
-	}
-
-	public class CdnUrl : IPacketDataObject
-	{
-		public string PackId { get; set; }
-
-		public string Url { get; set; }
-
-		public void Write(Packet packet)
-		{
-			packet.Write(PackId);
-			packet.Write(Url);
-		}
-
-		public static CdnUrl Read(Packet packet)
-		{
-			return new CdnUrl()
-			{
-				PackId = packet.ReadString(),
-				Url = packet.ReadString()
-			};
-		}
 	}
 
 	public enum ResourcePackType : byte
@@ -273,26 +111,27 @@ namespace MiNET.Utils
 		WorldTemplate = 8
 	}
 
-	public class ManifestStructure
-	{
-		public ManifestHeader Header { get; set; }
-		public List<ManifestModule> Modules { get; set; }
-	}
-
-	public class ManifestHeader
+	public class Header
 	{
 		public string Description { get; set; }
 		public string Name { get; set; }
 		public string Uuid { get; set; }
-		public List<int> Version { get; set; }  // Version is usually an array like [1, 0, 0]
+		public List<int> Version { get; set; }
+		public List<int> MinEngineVersion { get; set; }
 	}
 
-	public class ManifestModule
+	public class Module
 	{
-		public string Description { get; set; }
 		public string Type { get; set; }
 		public string Uuid { get; set; }
 		public List<int> Version { get; set; }
+	}
+
+	public class manifestStructure
+	{
+		public int FormatVersion { get; set; }
+		public Header Header { get; set; }
+		public List<Module> Modules { get; set; }
 	}
 
 	public class PlayerPackMapData

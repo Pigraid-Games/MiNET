@@ -50,7 +50,7 @@ namespace MiNET.Net
 		SetEnchantmentSeed = 20, //no longer used
 		StartSwimming = 21,
 		StopSwimming = 22,
-		StartSpinAttack = 23,
+		StartSpinAttack = 23, //no longer used: 1.21.40
 		StopSpinAttack = 24,
 		InteractBlock = 25,
 		PredictDestroyBlock = 26,

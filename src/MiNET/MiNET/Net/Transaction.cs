@@ -143,38 +143,18 @@ namespace MiNET.Net
 		{
 			return new StackRequestSlotInfo()
 			{
-				ContainerName = FullContainerName.Read(packet),
+				ContainerName = packet.readFullContainerName(),
 				Slot = packet.ReadByte(),
 				StackNetworkId = packet.ReadVarInt()
 			};
 		}
 	}
 
-	public class FullContainerName : IPacketDataObject
+	public class FullContainerName
 	{
 		public ContainerId ContainerId { get; set; }
 
-		public int? DynamicId { get; set; }
-
-		public void Write(Packet packet)
-		{
-			packet.Write((byte) ContainerId);
-
-			packet.Write(DynamicId.HasValue);
-			if (DynamicId.HasValue)
-			{
-				packet.Write(DynamicId.Value);
-			}
-		}
-
-		public static FullContainerName Read(Packet packet)
-		{
-			return new FullContainerName()
-			{
-				ContainerId = (ContainerId) packet.ReadByte(),
-				DynamicId = packet.ReadBool() ? packet.ReadInt() : null
-			};
-		}
+		public int DynamicId { get; set; }
 	}
 
 	public abstract class TakeOrPlaceAction : ItemStackAction
@@ -642,7 +622,7 @@ namespace MiNET.Net
 		{
 			var response = new StackResponseContainerInfo()
 			{
-                ContainerName = FullContainerName.Read(packet)
+                ContainerName = packet.readFullContainerName()
             };
 
 			var count = packet.ReadLength();

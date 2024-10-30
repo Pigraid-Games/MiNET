@@ -114,7 +114,7 @@ namespace MiNET
 
 		public DamageCalculator DamageCalculator { get; set; } = new DamageCalculator();
 
-		public ResourcePackInfos PlayerPackData { get; set; } = new ResourcePackInfos();
+		public TexturePackInfos PlayerPackData { get; set; } = new TexturePackInfos();
 		public ResourcePackInfos PlayerPackDataB { get; set; } = new ResourcePackInfos();
 		public Dictionary<string, PlayerPackMapData> PlayerPackMap = new Dictionary<string, PlayerPackMapData>();
 
@@ -407,15 +407,29 @@ namespace MiNET
 			McpeResourcePacksInfo packInfo = McpeResourcePacksInfo.CreateObject();
 			if (_serverHaveResources)
 			{
-				var packInfos = new ResourcePackInfos();
+				var packInfos = new TexturePackInfos();
+				var packInfosB = new ResourcePackInfos();
 				var directory = Config.GetProperty("ResourceDirectory", "ResourcePacks");
-				packInfo.mustAccept = Config.GetProperty("ForceResourcePacks", true);
+				var directoryB = Config.GetProperty("BehaviorDirectory", "BehaviorPacks");
+				packInfo.mustAccept = Config.GetProperty("ForceResourcePacks", false);
 
 				if (Directory.Exists(directory))
 				{
 					foreach (var zipPack in Directory.GetFiles(directory, "*.zip"))
 					{
 						var archive = ZipFile.OpenRead(zipPack);
+
+						/*
+						var packDir = archive.Entries[0].FullName.Substring(0, archive.Entries[0].FullName.IndexOf('/'));
+
+						if (packDir == null)
+						{
+							Disconnect($"Invalid resource pack {zipPack}. Wrong folder structure");
+							continue;
+						}
+
+						var entry = archive.GetEntry($"{packDir}/manifest.json");
+						*/
 
 						var entry = "";
 
@@ -444,20 +458,59 @@ namespace MiNET
 						using (var reader = new StreamReader(stream))
 						{
 							string jsonContent = reader.ReadToEnd();
-							ManifestStructure obj = JsonConvert.DeserializeObject<ManifestStructure>(jsonContent);
-							packInfos.Add(new ResourcePackInfo
+							manifestStructure obj = JsonConvert.DeserializeObject<manifestStructure>(jsonContent);
+							packInfos.Add(new TexturePackInfo
 							{
 								UUID = obj.Header.Uuid,
 								Version = $"{obj.Header.Version[0]}.{obj.Header.Version[1]}.{obj.Header.Version[2]}",
 								Size = (ulong) File.ReadAllBytes(zipPack).Count(),
+								ContentKey = encrypted ? File.ReadAllText($"{zipPack}.key") : "",
+								ContentIdentity = obj.Header.Uuid
 							});
 							PlayerPackMap.Add(obj.Header.Uuid, new PlayerPackMapData { pack = zipPack, type = ResourcePackType.Resources });
 						}
 					}
 					PlayerPackData = packInfos;
 				}
-				
-				packInfo.resourcePacks = packInfos;
+
+				if (Directory.Exists(directoryB))
+				{
+					foreach (var zipPack in Directory.GetFiles(directoryB, "*.zip"))
+					{
+						var archive = ZipFile.OpenRead(zipPack);
+						var entry = "";
+
+						for (byte i = 0; i < archive.Entries.Count; i++)
+						{
+							if (archive.Entries[i].ToString() == "manifest.json")
+							{
+								entry = archive.Entries[i].ToString();
+							}
+						}
+
+						if (entry == "")
+						{
+							Disconnect($"Invalid behaviour pack {zipPack}. Unable to locate manifest.json");
+							continue;
+						}
+
+						using (var stream = archive.GetEntry(entry).Open())
+						using (var reader = new StreamReader(stream))
+						{
+							string jsonContent = reader.ReadToEnd();
+							manifestStructure obj = JsonConvert.DeserializeObject<manifestStructure>(jsonContent);
+							packInfosB.Add(new ResourcePackInfo
+							{
+								UUID = obj.Header.Uuid,
+								Version = $"{obj.Header.Version[0]}.{obj.Header.Version[1]}.{obj.Header.Version[2]}",
+								Size = (ulong) File.ReadAllBytes(zipPack).Count()
+							});
+							PlayerPackMap.Add(obj.Header.Uuid, new PlayerPackMapData { pack = zipPack, type = ResourcePackType.Behaviour });
+						}
+					}
+					PlayerPackDataB = packInfosB;
+				}
+				packInfo.texturepacks = packInfos;
 			}
 			SendPacket(packInfo);
 		}
@@ -470,14 +523,22 @@ namespace MiNET
 			if (_serverHaveResources)
 			{
 				var packVersions = new ResourcePackIdVersions();
+				var packVersionsB = new ResourcePackIdVersions();
 				foreach (var packData in PlayerPackData)
 				{
 					packVersions.Add(new PackIdVersion { Id = packData.UUID, Version = packData.Version });
 				}
+				foreach (var packData in PlayerPackDataB)
+				{
+					packVersionsB.Add(new PackIdVersion { Id = packData.UUID, Version = packData.Version });
+				}
 				packStack.resourcepackidversions = packVersions;
+				packStack.behaviorpackidversions = packVersionsB;
 			}
+
 			SendPacket(packStack);
 		}
+
 
 		public virtual void HandleMcpePlayerInput(McpePlayerInput message)
 		{
@@ -1905,7 +1966,7 @@ namespace MiNET
 			var inventoryContent = McpeInventoryContent.CreateObject();
 			inventoryContent.inventoryId = (byte) WindowId.Inventory;
 			inventoryContent.input = Inventory.GetSlots();
-			inventoryContent.containerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
+			inventoryContent.ContainerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
 			SendPacket(inventoryContent);
 
 			SendPlayerArmor();
@@ -1913,13 +1974,13 @@ namespace MiNET
 			var uiContent = McpeInventoryContent.CreateObject();
 			uiContent.inventoryId = (byte) WindowId.UI;
 			uiContent.input = Inventory.GetUiSlots();
-			uiContent.containerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
+			uiContent.ContainerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
 			SendPacket(uiContent);
 
 			var offHandContent = McpeInventoryContent.CreateObject();
 			offHandContent.inventoryId = (byte) WindowId.Offhand;
 			offHandContent.input = Inventory.GetOffHand();
-			offHandContent.containerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
+			offHandContent.ContainerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
 			SendPacket(offHandContent);
 
 			var mobEquipment = McpeMobEquipment.CreateObject();
@@ -1935,7 +1996,7 @@ namespace MiNET
 			var armorContent = McpeInventoryContent.CreateObject();
 			armorContent.inventoryId = (byte) WindowId.Armor;
 			armorContent.input = Inventory.GetArmor();
-			armorContent.containerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
+			armorContent.ContainerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
 			SendPacket(armorContent);
 		}
 
@@ -2597,7 +2658,7 @@ namespace MiNET
 				sendSlot.slot = args.Slot;
 				//sendSlot.uniqueid = itemStack.UniqueId;
 				sendSlot.item = args.Item;
-				sendSlot.containerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
+				sendSlot.ContainerName = new FullContainerName() { ContainerId = ContainerId.Unknown };
 				SendPacket(sendSlot);
 			}
 
@@ -4068,11 +4129,6 @@ namespace MiNET
 		public void HandleMcpeServerboundLoadingScreen(McpeServerboundLoadingScreen message)
 		{
 			
-		}
-
-		public void HandleMcpeContainerRegistryCleanup(McpeContainerRegistryCleanup message)
-		{
-
 		}
 
 		public void HandleMcpeToastRequest(McpeToastRequest message)

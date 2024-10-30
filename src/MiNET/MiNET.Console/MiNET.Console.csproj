@@ -33,6 +33,12 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\MiNET.Client\MiNET.Client.csproj" />
     <ProjectReference Include="..\MiNET\MiNET.csproj" />
   </ItemGroup>

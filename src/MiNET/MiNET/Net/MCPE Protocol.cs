@@ -114,7 +114,6 @@ namespace MiNET.Net
 		void HandleMcpePlayerToggleCrafterSlotRequest(McpePlayerToggleCrafterSlotRequest message);
 		void HandleMcpeSetPlayerInventoryOptions(McpeSetPlayerInventoryOptions message);
 		void HandleMcpeServerboundLoadingScreen(McpeServerboundLoadingScreen message);
-		void HandleMcpeContainerRegistryCleanup(McpeContainerRegistryCleanup message);
 		void HandleMcpeToastRequest(McpeToastRequest message);
 		void HandleMcpeUnlockedReceipes(McpeUnlockedRecipes message);
 	}
@@ -259,6 +258,8 @@ namespace MiNET.Net
 		void HandleMcpeCameraAimAssist(McpeCameraAimAssist message);
 		void HandleMcpeAlexEntityAnimation(McpeAlexEntityAnimation message);
 		void HandleFtlCreatePlayer(FtlCreatePlayer message);
+		void HandleMcpeEmoteList(McpeEmoteList message);
+		void HandleMcpeEmote(McpeEmote message);
 	}
 
 	public class McpeClientMessageDispatcher
@@ -688,6 +689,12 @@ namespace MiNET.Net
 				case FtlCreatePlayer msg:
 					_messageHandler.HandleFtlCreatePlayer(msg);
 					break;
+				case McpeEmoteList msg:
+					_messageHandler.HandleMcpeEmoteList(msg);
+					break;
+				case McpeEmote msg:
+					_messageHandler.HandleMcpeEmote(msg);
+					break;
 				default:
 					return false;
 			}
@@ -1073,14 +1080,14 @@ namespace MiNET.Net
 						return McpeServerboundDiagnostics.CreateObject().Decode(buffer);
 					case 0x13c:
 						return McpeCameraAimAssist.CreateObject().Decode(buffer);
-					case 0x13d:
-						return McpeContainerRegistryCleanup.CreateObject().Decode(buffer);
 					case 0xe0:
 						return McpeAlexEntityAnimation.CreateObject().Decode(buffer);
 					case 0xba:
 						return McpeToastRequest.CreateObject().Decode(buffer);
 					case 0xc7:
 						return McpeUnlockedRecipes.CreateObject().Decode(buffer);
+					case 0x8a:
+						return McpeEmote.CreateObject().Decode(buffer);
 				}
 			}
 
@@ -2241,10 +2248,10 @@ namespace MiNET.Net
 	public partial class McpeResourcePacksInfo : Packet<McpeResourcePacksInfo>
 	{
 
-		public bool mustAccept;
-		public bool hasAddons;
-		public bool hasScripts;
-		public ResourcePackInfos resourcePacks;
+		public bool mustAccept; // = null;
+		public bool hasAddons; // = null;
+		public bool hasScripts; // = null;
+		public TexturePackInfos texturepacks; // = null;
 
 		public McpeResourcePacksInfo()
 		{
@@ -2261,7 +2268,7 @@ namespace MiNET.Net
 			Write(mustAccept);
 			Write(hasAddons);
 			Write(hasScripts);
-			Write(resourcePacks);
+			Write(texturepacks);
 
 			AfterEncode();
 		}
@@ -2278,7 +2285,7 @@ namespace MiNET.Net
 			mustAccept = ReadBool();
 			hasAddons = ReadBool();
 			hasScripts = ReadBool();
-			resourcePacks = ReadResourcePackInfos();
+			texturepacks = ReadTexturePackInfos();
 
 			AfterDecode();
 		}
@@ -2290,10 +2297,10 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			mustAccept = default;
-			hasAddons = default;
-			hasScripts = default;
-			resourcePacks = default;
+			mustAccept = default(bool);
+			hasAddons = default(bool);
+			hasScripts = default(bool);
+			texturepacks = default(TexturePackInfos);
 		}
 
 	}
@@ -3815,8 +3822,8 @@ namespace MiNET.Net
 		}
 		public enum ItemUseAction
 		{
-			Place,Clickblock = 0,
-			Use,Clickair = 1,
+			Place, Clickblock = 0,
+			Use, Clickair = 1,
 			Destroy = 2,
 		}
 		public enum ItemUseOnEntityAction
@@ -3826,7 +3833,14 @@ namespace MiNET.Net
 			ItemInteract = 2,
 		}
 
-		public Transaction transaction;
+		public enum TriggerType
+		{
+			Unknown = 0,
+			PlayerInput = 1,
+			SimulationTick = 2,
+		}
+
+		public Transaction transaction; // = null;
 
 		public McpeInventoryTransaction()
 		{
@@ -3866,7 +3880,7 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			transaction = default;
+			transaction = default(Transaction);
 		}
 
 	}
@@ -4891,10 +4905,10 @@ namespace MiNET.Net
 	public partial class McpeInventoryContent : Packet<McpeInventoryContent>
 	{
 
-		public uint inventoryId;
-		public ItemStacks input;
-		public FullContainerName containerName = new FullContainerName();
-		public Item storageItem;
+		public uint inventoryId; // = null;
+		public ItemStacks input; // = null;
+		public FullContainerName ContainerName = new FullContainerName();
+		public Item storageItem; // = null;
 
 		public McpeInventoryContent()
 		{
@@ -4910,7 +4924,7 @@ namespace MiNET.Net
 
 			WriteUnsignedVarInt(inventoryId);
 			Write(input);
-			Write(containerName);
+			Write(ContainerName);
 			Write(storageItem);
 
 			AfterEncode();
@@ -4927,7 +4941,7 @@ namespace MiNET.Net
 
 			inventoryId = ReadUnsignedVarInt();
 			input = ReadItemStacks();
-			containerName = ReadFullContainerName();
+			ContainerName = readFullContainerName();
 			storageItem = ReadItem();
 
 			AfterDecode();
@@ -4943,18 +4957,19 @@ namespace MiNET.Net
 			inventoryId = default(uint);
 			input = default(ItemStacks);
 			storageItem = default(Item);
-			containerName = default(FullContainerName);
+			ContainerName = default(FullContainerName);
 		}
+
 	}
 
 	public partial class McpeInventorySlot : Packet<McpeInventorySlot>
 	{
 
-		public uint inventoryId;
-		public uint slot;
-		public FullContainerName containerName = new FullContainerName();
-		public Item storageItem;
-		public Item item;
+		public uint inventoryId; // = null;
+		public uint slot; // = null;
+		public FullContainerName ContainerName = new FullContainerName();
+		public Item storageItem; // = null;
+		public Item item; // = null;
 
 		public McpeInventorySlot()
 		{
@@ -4970,7 +4985,7 @@ namespace MiNET.Net
 
 			WriteUnsignedVarInt(inventoryId);
 			WriteUnsignedVarInt(slot);
-			Write(containerName);
+			Write(ContainerName);
 			Write(storageItem);
 			Write(item);
 
@@ -4988,7 +5003,7 @@ namespace MiNET.Net
 
 			inventoryId = ReadUnsignedVarInt();
 			slot = ReadUnsignedVarInt();
-			containerName = ReadFullContainerName();
+			ContainerName = readFullContainerName();
 			storageItem = ReadItem();
 			item = ReadItem();
 
@@ -5004,10 +5019,11 @@ namespace MiNET.Net
 
 			inventoryId = default(uint);
 			slot = default(uint);
-			containerName = default(FullContainerName);
+			ContainerName = default(FullContainerName);
 			storageItem = default(Item);
 			item = default(Item);
 		}
+
 	}
 
 	public partial class McpeContainerSetData : Packet<McpeContainerSetData>
@@ -11148,14 +11164,18 @@ namespace MiNET.Net
 
 	}
 
-	public partial class McpeContainerRegistryCleanup : Packet<McpeContainerRegistryCleanup>
+	public partial class McpeEmote : Packet<McpeEmote>
 	{
+		public long runtimeEntityId;
+		public string xuid;
+		public string platformId;
+		public string emoteId;
+		public byte flags;
+		public uint tick;
 
-		public FullContainerName[] removedContainers;
-
-		public McpeContainerRegistryCleanup()
+		public McpeEmote()
 		{
-			Id = 0x13d;
+			Id = 0x8a;
 			IsMcpe = true;
 		}
 
@@ -11165,7 +11185,12 @@ namespace MiNET.Net
 
 			BeforeEncode();
 
-			Write(removedContainers);
+			WriteUnsignedVarLong(runtimeEntityId);
+			Write(emoteId);
+			WriteUnsignedVarInt(tick);
+			Write(xuid);
+			Write(platformId);
+			Write(flags);
 
 			AfterEncode();
 		}
@@ -11179,7 +11204,12 @@ namespace MiNET.Net
 
 			BeforeDecode();
 
-			removedContainers = ReadFullContainerNames();
+			runtimeEntityId = ReadUnsignedVarLong();
+			emoteId = ReadString();
+			tick = ReadUnsignedVarInt();
+			xuid = ReadString();
+			platformId = ReadString();
+			flags = ReadByte();
 
 			AfterDecode();
 		}
@@ -11191,9 +11221,64 @@ namespace MiNET.Net
 		{
 			base.ResetPacket();
 
-			removedContainers = default;
+			runtimeEntityId = default(long);
+			xuid = default(string);
+			platformId = default(string);
+			emoteId = default(string);
+			tick = default(uint);
+			flags = default(byte);
+		}
+	}
+
+	public partial class McpeEmoteList : Packet<McpeEmoteList>
+	{
+		public long runtimeEntityId;
+		public EmoteIds emoteIds;
+
+		public McpeEmoteList()
+		{
+			Id = 0x8a;
+			IsMcpe = true;
 		}
 
+		protected override void EncodePacket()
+		{
+			base.EncodePacket();
+
+			BeforeEncode();
+
+			WriteUnsignedVarLong(runtimeEntityId);
+			Write(emoteIds);
+
+			AfterEncode();
+		}
+
+		partial void BeforeEncode();
+		partial void AfterEncode();
+
+		protected override void DecodePacket()
+		{
+			base.DecodePacket();
+
+			BeforeDecode();
+
+			runtimeEntityId = ReadUnsignedVarLong();
+			emoteIds = ReadEmoteId();
+
+			AfterDecode();
+		}
+
+		partial void BeforeDecode();
+		partial void AfterDecode();
+
+		protected override void ResetPacket()
+		{
+			base.ResetPacket();
+
+			runtimeEntityId = default(long);
+			emoteIds = default(EmoteIds);
+
+		}
 	}
 
 	public partial class McpeAlexEntityAnimation : Packet<McpeAlexEntityAnimation>

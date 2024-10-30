@@ -767,20 +767,18 @@ namespace MiNET.Net
 			return EnchantOptions.Read(this);
 		}
 
-		public FullContainerName ReadFullContainerName()
+		public FullContainerName readFullContainerName()
 		{
-			return FullContainerName.Read(this);
+			var name = new FullContainerName();
+			name.ContainerId = (ContainerId)ReadByte();
+			name.DynamicId = ReadByte();
+			return name;
 		}
 
-		public FullContainerName[] ReadFullContainerNames()
+		public void Write(FullContainerName name)
 		{
-			var containers = new FullContainerName[ReadLength()];
-			for (var i = 0; i < containers.Length; i++)
-			{
-				containers[i] = FullContainerName.Read(this);
-			}
-
-			return containers;
+			Write((byte)name.ContainerId);
+			Write((byte)name.DynamicId);
 		}
 
 		public AnimationKey[] ReadAnimationKeys()
@@ -1112,7 +1110,27 @@ namespace MiNET.Net
 				Write(record.StatesCacheNbt);
 			}
 		}
-		
+
+		public EmoteIds ReadEmoteId()
+		{
+			EmoteIds Ids = new EmoteIds();
+			var emoteCount = ReadUnsignedVarInt();
+			for (int i = 0; i < (int) emoteCount; i++)
+			{
+				Ids.emoteId.Add(ReadUUID());
+			}
+			return Ids;
+		}
+
+		public void Write(EmoteIds Ids)
+		{
+			Write(Ids.emoteId.Count);
+			foreach (var emoteIds in Ids.emoteId)
+			{
+				Write(emoteIds);
+			}
+		}
+
 		public AbilityLayers ReadAbilityLayers()
 		{
 			return AbilityLayers.Read(this);
@@ -1123,31 +1141,163 @@ namespace MiNET.Net
 			return EntityLinks.Read(this);
 		}
 
-		public CdnUrls ReadCdnUrls()
+		public void Write(TexturePackInfos packInfos)
 		{
-			return CdnUrls.Read(this);
+			if (packInfos == null)
+			{
+				_writer.Write((short) 0);
+
+				return;
+			}
+
+			_writer.Write((short) packInfos.Count); // LE
+													//WriteVarInt(packInfos.Count);
+			foreach (var info in packInfos)
+			{
+				Write(info.UUID);
+				Write(info.Version);
+				Write(info.Size);
+				Write(info.ContentKey);
+				Write(info.SubPackName);
+				Write(info.ContentIdentity);
+				Write(info.HasScripts);
+				Write(info.isAddon);
+				Write(info.RtxEnabled);
+				Write(info.cndUrls);
+			}
+		}
+
+		public TexturePackInfos ReadTexturePackInfos()
+		{
+			int count = _reader.ReadInt16(); // LE
+											 //int count = ReadVarInt(); // LE
+
+			var packInfos = new TexturePackInfos();
+			for (int i = 0; i < count; i++)
+			{
+				var info = new TexturePackInfo();
+				var id = ReadString();
+				var version = ReadString();
+				var size = ReadUlong();
+				var encryptionKey = ReadString();
+				var subpackName = ReadString();
+				var contentIdentity = ReadString();
+				var hasScripts = ReadBool();
+				var isAddon = ReadBool();
+				var rtxEnabled = ReadBool();
+				var cndUrls = ReadString();
+
+
+				info.UUID = id;
+				info.Version = version;
+				info.Size = size;
+				info.HasScripts = hasScripts;
+				info.ContentKey = encryptionKey;
+				info.SubPackName = subpackName;
+				info.ContentIdentity = contentIdentity;
+				info.isAddon = isAddon;
+				info.RtxEnabled = rtxEnabled;
+				info.cndUrls = cndUrls;
+
+				packInfos.Add(info);
+			}
+
+			return packInfos;
 		}
 
 		public void Write(ResourcePackInfos packInfos)
 		{
-			if (packInfos == null || packInfos.Count == 0)
+			if (packInfos == null)
 			{
-				Write((short) 0); // LE
-				//WriteVarInt(0);
+				_writer.Write((short) 0);
 				return;
 			}
 
-			packInfos.Write(this);
+			_writer.Write((short) packInfos.Count); // LE
+													//WriteVarInt(packInfos.Count);
+			foreach (var info in packInfos)
+			{
+				Write(info.UUID);
+				Write(info.Version);
+				Write(info.Size);
+				Write(info.ContentKey);
+				Write(info.SubPackName);
+				Write(info.ContentIdentity);
+				Write(info.HasScripts);
+				Write(info.isAddon);
+			}
 		}
 
 		public ResourcePackInfos ReadResourcePackInfos()
 		{
-			return ResourcePackInfos.Read(this);
+			int count = _reader.ReadInt16(); // LE
+											 //int count = ReadVarInt(); // LE
+
+			var packInfos = new ResourcePackInfos();
+			for (int i = 0; i < count; i++)
+			{
+				var info = new ResourcePackInfo();
+
+				var id = ReadString();
+				var version = ReadString();
+				var size = ReadUlong();
+				var encryptionKey = ReadString();
+				var subpackName = ReadString();
+				var contentIdentity = ReadString();
+				var hasScripts = ReadBool();
+				var isAddon = ReadBool();
+
+				info.UUID = id;
+				info.Version = version;
+				info.Size = size;
+				info.ContentKey = encryptionKey;
+				info.SubPackName = subpackName;
+				info.ContentIdentity = contentIdentity;
+				info.HasScripts = hasScripts;
+				info.isAddon = isAddon;
+
+				packInfos.Add(info);
+			}
+
+			return packInfos;
+		}
+
+		public void Write(ResourcePackIdVersions packInfos)
+		{
+			if (packInfos == null || packInfos.Count == 0)
+			{
+				WriteUnsignedVarInt(0);
+				return;
+			}
+			WriteUnsignedVarInt((uint) packInfos.Count); // LE
+			foreach (var info in packInfos)
+			{
+				Write(info.Id);
+				Write(info.Version);
+				Write(info.SubPackName);
+			}
 		}
 
 		public ResourcePackIdVersions ReadResourcePackIdVersions()
 		{
-			return ResourcePackIdVersions.Read(this);
+			uint count = ReadUnsignedVarInt();
+
+			var packInfos = new ResourcePackIdVersions();
+			for (int i = 0; i < count; i++)
+			{
+				var id = ReadString();
+				var version = ReadString();
+				var subPackName = ReadString();
+				var info = new PackIdVersion
+				{
+					Id = id,
+					Version = version,
+					SubPackName = subPackName
+				};
+				packInfos.Add(info);
+			}
+
+			return packInfos;
 		}
 
 		public void Write(ResourcePackIds ids)
@@ -1157,13 +1307,26 @@ namespace MiNET.Net
 				Write((short) 0);
 				return;
 			}
+			Write((short) ids.Count);
 
-			ids.Write(this);
+			foreach (var id in ids)
+			{
+				Write(id);
+			}
 		}
 
 		public ResourcePackIds ReadResourcePackIds()
 		{
-			return ResourcePackIds.Read(this);
+			int count = ReadShort();
+
+			var ids = new ResourcePackIds();
+			for (int i = 0; i < count; i++)
+			{
+				var id = ReadString();
+				ids.Add(id);
+			}
+
+			return ids;
 		}
 
 		public void Write(Skin skin)
@@ -1223,7 +1386,7 @@ namespace MiNET.Net
 					Write(color);
 				}
 			}
-			
+
 			Write(skin.IsPremiumSkin);
 			Write(skin.IsPersonaSkin);
 			Write(skin.Cape.OnClassicSkin);
